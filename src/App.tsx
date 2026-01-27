@@ -6,11 +6,11 @@ import * as XLSX from "xlsx";
 import { 
   processExcelData, 
   obtenerHorariosPorPlanta, 
-  normalizarColumnas, 
-  mapDepartamentoAPlanta,
-  PlanResult, 
-  HorarioTecnico 
+  normalizarColumnas,   
 } from "./logic/excelProcessor";
+import { PlannerService } from "./logic/PlannerService";
+import { PlanResult, HorarioTecnico } from "./types";
+
 import { FileUploader } from "./components/FileUploader";
 import { DashboardView } from "./views/DashboardView";
 import { MaestroView } from "./views/MaestroView";
@@ -20,32 +20,39 @@ import { AtrasosView } from "./views/AtrasosView";
 import { processAtrasos, AtrasoRow } from "./logic/atrasosProcessor";
 import { FileSpreadsheet } from "lucide-react";
 
+import { processSeguimiento } from "./logic/seguimientoProcessor";
+import { SeguimientoView } from "./views/SeguimientoView";
+import { SeguimientoResult } from "./types";
+import { ClipboardList } from "lucide-react";
+
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
   const [datosCrudos, setDatosCrudos] = useState<any[]>([]);
   const [planResult, setPlanResult] = useState<PlanResult[]>([]);
   const [horariosResult, setHorariosResult] = useState<HorarioTecnico[]>([]);
   const [workbookActual, setWorkbookActual] = useState<XLSX.WorkBook | null>(null);
-  const [plantas] = useState(["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"]);
+  const [plantas] = useState(["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "SADEMA"]);
   
-  // Estados de carga independientes
-  const [archivoCargado, setArchivoCargado] = useState(false); // Para el Maestro Plan
-  const [atrasosResult, setAtrasosResult] = useState<AtrasoRow[]>([]); // Para Atrasos
-  const [atrasosAnterior, setAtrasosAnterior] = useState<AtrasoRow[]>([]); // NUEVO: Para el histórico
+  const [archivoCargado, setArchivoCargado] = useState(false);
+  const [atrasosResult, setAtrasosResult] = useState<AtrasoRow[]>([]);
+  const [atrasosAnterior, setAtrasosAnterior] = useState<AtrasoRow[]>([]);
 
   const [cargandoPlan, setCargandoPlan] = useState(false);
   const [cargandoAtrasos, setCargandoAtrasos] = useState(false);
 
-  // Estados de filtros de vista
   const [plantaMaestro, setPlantaMaestro] = useState("PF3");
   const [plantaHorarios, setPlantaHorarios] = useState("PF3");
   const [plantaPlan, setPlantaPlan] = useState("PF3");
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR') => {
+  const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
+  const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (tipo === 'PLAN') setCargandoPlan(true);
+    else if (tipo === 'SEGUIMIENTO') setCargandoSeguimiento(true);
     else setCargandoAtrasos(true);
 
     const reader = new FileReader();
@@ -60,14 +67,23 @@ function App() {
           setDatosCrudos(normalizarColumnas(rawAct));
           setHorariosResult(obtenerHorariosPorPlanta(workbook, plantaHorarios));
           setArchivoCargado(true);
+          // Opcional: Limpiar resultados de planes anteriores al cargar nuevo archivo
+          setPlanResult([]);
         } else if (tipo === 'ATRASOS') {
-          // Reporte Actual de SAP
-          const atrasos = processAtrasos(workbook.Sheets);
-          setAtrasosResult(atrasos);
+          setAtrasosResult(processAtrasos(workbook.Sheets));
+          setActiveTab("atrasos");
         } else if (tipo === 'ANTERIOR') {
-          // Reporte Histórico (el que tiene la hoja RESUMEN_DATA)
-          const atrasos = processAtrasos(workbook.Sheets);
-          setAtrasosAnterior(atrasos);
+          setAtrasosAnterior(processAtrasos(workbook.Sheets));
+        } else if (tipo === 'SEGUIMIENTO') {
+          const resultados = processSeguimiento(workbook.Sheets);
+          setSeguimientoResult(resultados);
+          
+          // IMPORTANTE: Si hay datos, cambiar la vista automáticamente
+          if (resultados.mantencion.length > 0 || resultados.infraestructura.length > 0) {
+            setActiveTab("seguimiento"); 
+          } else {
+            alert("El archivo se leyó, pero no se encontraron filas válidas según la lógica (Hojas STGO, PF1, etc).");
+          }
         }
       } catch (e) {
         console.error("Error al procesar:", e);
@@ -75,6 +91,7 @@ function App() {
       } finally {
         setCargandoPlan(false);
         setCargandoAtrasos(false);
+        setCargandoSeguimiento(false);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -87,20 +104,31 @@ function App() {
     setAtrasosAnterior([]);
     setArchivoCargado(false);
     setActiveTab("dash");
+    setSeguimientoResult({ mantencion: [], infraestructura: [] });
   };
 
   const cambiarPlantaHorarios = (nueva: string) => {
     setPlantaHorarios(nueva);
     if (workbookActual) {
-      // Esta función viene de excelProcessor.ts
       setHorariosResult(obtenerHorariosPorPlanta(workbookActual, nueva));
     }
   };
   
+  // Función para ejecutar la lógica del Planner
+  const ejecutarPlanificacion = () => {
+    if (workbookActual) {
+      // processExcelData internamente usará la clase Planner que ya modificamos
+      const resultados = processExcelData(workbookActual.Sheets);
+      setPlanResult(resultados);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-pf-light text-slate-800 font-sans">
       <Sidebar 
         archivoCargado={archivoCargado || atrasosResult.length > 0} 
+        tieneAtrasos={atrasosResult.length > 0}
+        tieneSeguimiento={seguimientoResult.mantencion.length > 0}
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onLimpiar={limpiarDatos} 
@@ -109,38 +137,39 @@ function App() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <section className="flex-1 p-10 overflow-y-auto">
           
-          {/* VISTA DASHBOARD: Siempre accesible para cargar nuevos archivos */}
           {activeTab === "dash" && (
             <div className="space-y-10">
               <div className="bg-white p-8 rounded-3xl border border-pf-border shadow-sm">
-                <h2 className="text-2xl font-black mb-6">Gestión de Datos</h2>
+                <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter">Gestión de Datos</h2>
                 <FileUploader 
                   onFileUpload={handleFileUpload} 
                   isLoading={cargandoPlan || cargandoAtrasos}
                   status={{ 
                     plan: archivoCargado, 
                     atrasos: atrasosResult.length > 0,
-                    anterior: atrasosAnterior.length > 0 
+                    anterior: atrasosAnterior.length > 0 ,
+                    seguimiento: seguimientoResult.mantencion.length > 0
                   }}
                 />
               </div>
               
               {archivoCargado && (
-                <DashboardView planResult={planResult} onEjecutarPlan={() => {
-                  if (workbookActual) setPlanResult(processExcelData(workbookActual.Sheets));
-                }} />
+                <DashboardView 
+                  planResult={planResult} 
+                  onEjecutarPlan={ejecutarPlanificacion} 
+                />
               )}
             </div>
           )}
 
-          {/* VISTAS DE MAESTRO PLAN (Requieren archivoCargado) */}
           {archivoCargado && (
             <>
               {activeTab === "maestro" && (
                 <MaestroView 
                   datosCrudos={datosCrudos.filter(orden => {
                     const deptoKey = Object.keys(orden).find(k => k.includes("DEPARTAMENTO")) || "";
-                    return mapDepartamentoAPlanta(orden[deptoKey]) === plantaMaestro;
+                    // Usamos el método estático del servicio refactorizado
+                    return PlannerService.mapDepartamentoAPlanta(orden[deptoKey]) === plantaMaestro;
                   })}
                   plantas={plantas} 
                   plantaSeleccionada={plantaMaestro} 
@@ -166,7 +195,6 @@ function App() {
             </>
           )}
           
-          {/* VISTA DE ATRASOS (Requiere atrasosResult) */}
           {activeTab === "atrasos" && atrasosResult.length > 0 && (
             <AtrasosView 
               data={atrasosResult} 
@@ -174,13 +202,24 @@ function App() {
             />
           )}
 
-          {/* FALLBACK: Si no hay datos cargados para la pestaña seleccionada */}
-          {((!archivoCargado && ["maestro", "plan", "gantt"].includes(activeTab)) || 
-            (atrasosResult.length === 0 && activeTab === "atrasos")) && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+          {(activeTab === "seguimiento" && seguimientoResult.mantencion.length > 0) && (
+            <SeguimientoView 
+                dataMantencion={seguimientoResult.mantencion} 
+                dataInfra={seguimientoResult.infraestructura} 
+            />
+          )}
+
+          {/* FALLBACK (PANTALLA DE BLOQUEO) ACTUALIZADA */}
+          {/* Esta lógica decide cuándo mostrar el mensaje de "Cargue archivo" */}
+          { (
+            (!archivoCargado && ["maestro", "plan", "gantt"].includes(activeTab)) || 
+            (atrasosResult.length === 0 && activeTab === "atrasos") ||
+            (seguimientoResult.mantencion.length === 0 && seguimientoResult.infraestructura.length === 0 && activeTab === "seguimiento")
+          ) && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 animate-in fade-in duration-300">
               <FileSpreadsheet size={64} className="mb-4 opacity-20" />
-              <p className="font-bold text-lg">Este módulo requiere que cargues el archivo correspondiente</p>
-              <button onClick={() => setActiveTab("dash")} className="mt-4 text-pf-red font-black hover:underline">
+              <p className="font-bold text-lg italic">Este módulo requiere que cargues el archivo correspondiente</p>
+              <button onClick={() => setActiveTab("dash")} className="mt-4 text-pf-red font-black hover:underline uppercase text-sm tracking-widest">
                 Ir al Gestor de Datos
               </button>
             </div>
@@ -190,4 +229,5 @@ function App() {
     </div>
   );
 }
+
 export default App;

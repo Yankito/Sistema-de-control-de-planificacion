@@ -1,3 +1,4 @@
+// src/views/AtrasosView.tsx
 import { useState, useMemo } from "react";
 import { AtrasoRow } from "../logic/atrasosProcessor";
 import { X, Search, FileText, LayoutGrid, Factory, TrendingUp, TrendingDown, Minus, Download } from "lucide-react";

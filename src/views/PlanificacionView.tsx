@@ -1,3 +1,4 @@
+// src/views/PlanificacionView.tsx
 import { useState } from "react";
 import { DataTable } from "../components/DataTable";
 import { 
@@ -192,8 +193,23 @@ export const PlanificacionView = ({ planResult, plantaSeleccionada, plantas, onC
                       <p className="text-[12px] font-black text-pf-red uppercase">OT: {orden.nroOrden}</p>
                       {renderRolBadge(orden.rol)}
                     </div>
-                    <p className="font-bold text-slate-800 leading-tight mb-4">{orden.descripcion}</p>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter italic">{orden.mecanico}</p>
+                    
+                    <p className="font-bold text-slate-800 leading-tight mb-3">{orden.descripcion}</p>
+                    
+                    {/* NUEVA SECCIÓN: FECHA MES ANTERIOR */}
+                    <div className="flex items-center space-x-2 mb-4 bg-white/50 w-fit px-3 py-1 rounded-lg border border-slate-100">
+                      <CalendarIcon size={10} className="text-slate-400" />
+                      <span className="text-[10px] font-bold text-slate-500">
+                        Mes anterior: <span className="text-slate-700">{orden.fechaAnterior}</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter italic">{orden.mecanico}</p>
+                      <span className="text-[9px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-md font-black italic">
+                        {orden.equipo}
+                      </span>
+                    </div>
                   </div>
                 ))
               ) : (

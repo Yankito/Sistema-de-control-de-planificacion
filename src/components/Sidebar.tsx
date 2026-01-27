@@ -6,16 +6,28 @@ import {
   CalendarCheck,
   RotateCcw,
   Clock,
-  Lock
+  Lock,
+  ClipboardList
 } from "lucide-react";
 
-export const Sidebar = ({ archivoCargado, activeTab, setActiveTab, onLimpiar }: any) => {
+export const Sidebar = ({ 
+  archivoCargado, 
+  tieneAtrasos, 
+  tieneSeguimiento, 
+  activeTab, 
+  setActiveTab, 
+  onLimpiar 
+}: any) => {
+
+  const hayDatos = archivoCargado || tieneAtrasos || tieneSeguimiento;
+
   const menuItems = [
-    { id: 'dash', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'maestro', label: 'Maestro Excel', icon: FileSpreadsheet },
-    { id: 'plan', label: 'Planificación', icon: CalendarCheck }, // Agregada vista independiente
-    { id: 'gantt', label: 'Gantt Turnos', icon: Calendar },
-    { id: 'atrasos', label: 'Atrasos/KPI', icon: Clock },
+    { id: 'dash', label: 'Dashboard', icon: LayoutDashboard, locked: false },
+    { id: 'maestro', label: 'Maestro Excel', icon: FileSpreadsheet, locked: !archivoCargado },
+    { id: 'plan', label: 'Planificación', icon: CalendarCheck, locked: !archivoCargado },
+    { id: 'gantt', label: 'Gantt Turnos', icon: Calendar, locked: !archivoCargado },
+    { id: 'atrasos', label: 'Atrasos/KPI', icon: Clock, locked: !tieneAtrasos },
+    { id: 'seguimiento', label: 'Seguimiento OT', icon: ClipboardList, locked: !tieneSeguimiento },
   ];
 
   return (
@@ -32,14 +44,13 @@ export const Sidebar = ({ archivoCargado, activeTab, setActiveTab, onLimpiar }: 
 
       <nav className="flex-1 px-4 space-y-1.5">
         {menuItems.map((item) => (
-          // Dentro del mapeo de menuItems en Sidebar.tsx
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            disabled={!archivoCargado && item.id !== 'dash'}
+            disabled={item.locked}
             className={`
               flex items-center justify-between w-full p-3 rounded-xl transition-all duration-200
-              ${!archivoCargado && item.id !== 'dash' 
+              ${item.locked 
                 ? 'opacity-30 cursor-not-allowed grayscale' 
                 : 'hover:bg-slate-100'}
               ${activeTab === item.id 
@@ -51,12 +62,12 @@ export const Sidebar = ({ archivoCargado, activeTab, setActiveTab, onLimpiar }: 
               <item.icon size={18} />
               <span className="font-semibold text-sm">{item.label}</span>
             </div>
-            {!archivoCargado && item.id !== 'dash' && <Lock size={12} className="text-slate-400" />}
+            {item.locked && <Lock size={12} className="text-slate-400" />}
           </button>
         ))}
 
         {/* Separador y Botón de Limpiar */}
-        {archivoCargado && (
+        {hayDatos && (
           <div className="pt-4 mt-4 border-t border-pf-border/50">
             <button
               onClick={onLimpiar}
@@ -69,13 +80,15 @@ export const Sidebar = ({ archivoCargado, activeTab, setActiveTab, onLimpiar }: 
         )}
       </nav>
 
+      {/* Footer de Estado */}
       <div className="p-6 border-t border-pf-border">
         <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-pf-border">
-          <div className={`w-2.5 h-2.5 rounded-full ${archivoCargado ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`}></div>
+          {/* También actualizamos el indicador visual aquí */}
+          <div className={`w-2.5 h-2.5 rounded-full ${hayDatos ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`}></div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-slate-600 uppercase">Complejo Industrial</span>
             <span className="text-[9px] text-slate-400 font-medium">
-              {archivoCargado ? 'SISTEMA ONLINE' : 'ESPERANDO DATOS'}
+              {hayDatos ? 'SISTEMA ONLINE' : 'ESPERANDO DATOS'}
             </span>
           </div>
         </div>

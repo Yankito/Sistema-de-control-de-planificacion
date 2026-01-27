@@ -1,11 +1,12 @@
-import { FileSpreadsheet, UploadCloud, Clock, History } from "lucide-react";
+// src/components/FileUploader.tsx
+import { FileSpreadsheet, UploadCloud, Clock, History, FileCheck2 } from "lucide-react";
 import { useState } from "react";
 
 interface FileUploaderProps {
-  onFileUpload: (e: any, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR') => void;
+  onFileUpload: (e: any, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => void;
   isLoading: boolean;
   // Actualizamos status para incluir el reporte anterior
-  status: { plan: boolean; atrasos: boolean; anterior: boolean };
+  status: { plan: boolean; atrasos: boolean; anterior: boolean; seguimiento: boolean };
 }
 
 export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderProps) => {
@@ -21,13 +22,15 @@ export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderPr
     const name = file.name.toLowerCase();
     
     // Lógica inteligente de detección por nombre
-    let tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' = 'PLAN';
-    
+    let tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' = 'PLAN';
     if (name.includes("resumen") || name.includes("historico")) {
       tipo = 'ANTERIOR';
     } else if (name.includes("atraso") || name.includes("cumplimiento") || name.includes("kpi")) {
       tipo = 'ATRASOS';
+    } else if (name.includes("s") || name.includes("stgo")) {
+      tipo = 'SEGUIMIENTO';
     }
+    console.log("Detectado tipo de archivo:", tipo);
 
     const fakeEvent = { target: { files: [file] } } as any;
     onFileUpload(fakeEvent, tipo);
@@ -96,6 +99,20 @@ export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderPr
                 <span className="text-[9px] opacity-80 uppercase">{status.anterior ? '✓ Comparando' : 'Subir Resumen'}</span>
               </div>
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'ANTERIOR')} disabled={isLoading} />
+            </label>
+
+            {/* 4. Nuevo Botón SEGUIMIENTO */}
+            <label className={`flex items-center p-4 rounded-2xl font-bold transition-all cursor-pointer shadow-md border-2 hover:scale-[1.02] active:scale-95 ${
+              status.seguimiento 
+                ? 'bg-purple-600 border-purple-600 text-white' 
+                : 'bg-white border-slate-200 text-purple-600 hover:border-purple-400'
+            }`}>
+              <FileCheck2 size={20} className={`mr-3 flex-shrink-0 ${status.seguimiento ? 'text-white' : 'text-purple-500'}`} />
+              <div className="flex flex-col leading-tight">
+                <span className="text-xs">Seguimiento OT</span>
+                <span className="text-[9px] opacity-80 uppercase">{status.seguimiento ? '✓ Procesado' : 'Subir Excel'}</span>
+              </div>
+              <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'SEGUIMIENTO')} disabled={isLoading} />
             </label>
 
           </div>
