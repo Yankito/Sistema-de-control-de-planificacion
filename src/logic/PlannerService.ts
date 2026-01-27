@@ -1,4 +1,5 @@
-import { PlanResult, HorarioTecnico } from "../types"; // Mueve las interfaces a un archivo de tipos
+// src/logic/PlannerService.ts
+import { PlanResult } from "../types";
 
 const excelDateToJS = (serial: any) => {
   if (serial instanceof Date) return serial;
@@ -8,8 +9,24 @@ const excelDateToJS = (serial: any) => {
 
 export class PlannerService {
   /**
-   * Procesa la lógica de cruce entre Activos, Anteriores y Cumplimiento
+   * Ajusta la fecha si cae domingo, moviéndola al lunes siguiente.
    */
+  private static evitarDomingo(fecha: Date): Date {
+    const copiaFecha = new Date(fecha);
+    // getDay() devuelve 0 para Domingo
+    if (copiaFecha.getDay() === 0) {
+      copiaFecha.setDate(copiaFecha.getDate() + 1);
+    }
+    return copiaFecha;
+  }
+
+  /**
+   * Formatea la fecha a DD/MM/YYYY
+   */
+  private static formatearFecha(fecha: Date): string {
+    return `${String(fecha.getDate()).padStart(2, '0')}/${String(fecha.getMonth() + 1).padStart(2, '0')}/${fecha.getFullYear()}`;
+  }
+
   static generarPlanificacion(
     dfAct: any[], 
     dfAnt: any[], 
@@ -48,13 +65,18 @@ export class PlannerService {
                     const fechaKey = Object.keys(matchAnt).find(k => k.includes("FECHA INICIAL PROGRAMADA")) || "";
                     const fechaBase = excelDateToJS(matchAnt[fechaKey]);
 
-                    // 1. Guardamos la fecha anterior formateada
-                    const fechaAnteriorFormateada = `${String(fechaBase.getDate()).padStart(2, '0')}/${String(fechaBase.getMonth() + 1).padStart(2, '0')}/${fechaBase.getFullYear()}`;
+                    // 1. Guardamos la fecha anterior (sin modificar)
+                    const fechaAnteriorFormateada = this.formatearFecha(fechaBase);
                     
-                    // 2. Calculamos la nueva fecha (Sugerida)
-                    const nuevaFecha = new Date(fechaBase);
+                    // 2. Calculamos la nueva fecha (Mes + 1)
+                    let nuevaFecha = new Date(fechaBase);
                     nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
-                    const fechaSugeridaFormateada = `${String(nuevaFecha.getDate()).padStart(2, '0')}/${String(nuevaFecha.getMonth() + 1).padStart(2, '0')}/${nuevaFecha.getFullYear()}`;
+
+                    // --- AJUSTE DOMINGO ---
+                    // Si cae domingo, se mueve al lunes
+                    nuevaFecha = this.evitarDomingo(nuevaFecha);
+                    
+                    const fechaSugeridaFormateada = this.formatearFecha(nuevaFecha);
 
                     const otKeyAct = Object.keys(filaAct).find(k => k.includes("PEDIDO") || k.includes("TRABAJO")) || "";
 
@@ -63,7 +85,7 @@ export class PlannerService {
                         equipo: actRaw,
                         descripcion: descRaw,
                         fechaSugerida: fechaSugeridaFormateada,
-                        fechaAnterior: fechaAnteriorFormateada, // <--- Nuevo campo asignado
+                        fechaAnterior: fechaAnteriorFormateada,
                         mecanico: nombreMec,
                         rol: datosEmp.rol,
                         planta: plantaOrden
@@ -89,5 +111,5 @@ export class PlannerService {
     if (d.includes("MANTENCION") || d.includes("MANTENCIÓN") || d.includes("MANT.")) return "PF3";
     if (d.includes("VENTAS") || d.includes("DATA") || d.includes("LOGISTICA") || d.includes("CDT")) return "CDT";
     return "OTROS";
-    };
+  }
 }

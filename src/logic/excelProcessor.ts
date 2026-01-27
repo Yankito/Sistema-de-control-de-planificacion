@@ -32,7 +32,12 @@ export const processExcelData = (sheets: { [key: string]: XLSX.WorkSheet }) => {
     }
   });
 
-  return PlannerService.generarPlanificacion(dfAct, dfAnt, dfCumplimiento, empleadosMap);
+  const resultados = PlannerService.generarPlanificacion(dfAct, dfAnt, dfCumplimiento, empleadosMap);
+  
+  return {
+    resultados,
+    empleadosMap
+  };
 };
 
 // Re-incorporamos esta función aquí ya que es lectura pura de Workbook

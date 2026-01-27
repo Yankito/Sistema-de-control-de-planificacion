@@ -12,7 +12,7 @@ export interface AtrasoRow {
   ot: string;
   descripcion: string;
   estado: string;
-  clasificacion: "TECNICO / SERVICIO" | "PROGRAMADOR" | "OC / OTRO";
+  clasificacion: "TECNICO / SERVICIO" | "PROGRAMADOR" | "OC / OTRO" | "CUMPLIDA";
   periodo: "2025" | "ENE-26" | "S/A";
   esOB: boolean;
   detallesTecnicos?: TecnicoEstado[];
@@ -131,7 +131,7 @@ export const processAtrasos = (sheets: { [key: string]: XLSX.WorkSheet }): Atras
         }
       }
 
-      // --- LÓGICA DE PERIODO (Fechas de SAP) ---
+      // --- LÓGICA DE PERIODO ---
       const fechaRaw = fila["FECHA INICIAL PROGRAMADA"];
       let periodo: any = "S/A";
       if (fechaRaw) {

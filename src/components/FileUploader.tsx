@@ -36,26 +36,33 @@ export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderPr
     onFileUpload(fakeEvent, tipo);
   };
 
-  return (
+return (
     <div className="max-w-5xl mx-auto mt-2">
       <div 
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
         className={`
           relative border-2 border-dashed rounded-[2rem] p-10 transition-all duration-300
-          ${isDragging 
-            ? "border-pf-red bg-pf-red/5 scale-[1.01] shadow-xl shadow-pf-red/5" 
-            : "border-slate-200 bg-white shadow-sm"}
-          ${isLoading ? "opacity-60 cursor-wait" : "cursor-default"}
+          ${isDragging ? "border-pf-red bg-pf-red/5 scale-[1.01]" : "border-slate-200 bg-white"}
+          ${isLoading ? "cursor-wait" : "cursor-default"}
         `}
       >
-        <div className="flex flex-col items-center">
-          <div className={`
-            w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500
-            ${isDragging ? "bg-pf-red text-white -rotate-12 scale-110" : "bg-slate-50 text-pf-red"}
-          `}>
-            <UploadCloud size={32} className={isDragging ? "animate-bounce" : ""} />
+        {/* OVERLAY DE CARGA - Evita que se vea congelado */}
+        {isLoading && (
+          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm rounded-[2rem] flex flex-col items-center justify-center animate-in fade-in duration-300">
+            <div className="w-20 h-20 relative">
+               <div className="absolute inset-0 border-4 border-pf-red/20 rounded-full"></div>
+               <div className="absolute inset-0 border-4 border-pf-red rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <p className="mt-4 font-black text-slate-800 animate-pulse uppercase tracking-widest text-xs">
+              Procesando Datos...
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold">Por favor, no cierres la ventana</p>
+          </div>
+        )}
+
+        <div className={`flex flex-col items-center ${isLoading ? 'blur-sm' : ''}`}>
+          {/* Contenido original del Uploader... */}
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-slate-50 text-pf-red`}>
+            <UploadCloud size={32} />
           </div>
 
           <h2 className="text-xl font-black text-slate-800 mb-2">
@@ -77,12 +84,12 @@ export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderPr
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'PLAN')} disabled={isLoading} />
             </label>
 
-            {/* 2. Reporte Actual (SAP) */}
+            {/* 2. Reporte Actual */}
             <label className={`flex items-center p-4 rounded-2xl font-bold text-white transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-95 ${status.atrasos ? 'bg-green-600' : 'bg-slate-800'}`}>
               <Clock size={20} className="mr-3 flex-shrink-0" />
               <div className="flex flex-col leading-tight">
                 <span className="text-xs">Reporte Actual</span>
-                <span className="text-[9px] opacity-80 uppercase">{status.atrasos ? '✓ Cargado' : 'Subir KPI SAP'}</span>
+                <span className="text-[9px] opacity-80 uppercase">{status.atrasos ? '✓ Cargado' : 'Subir KPI'}</span>
               </div>
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'ATRASOS')} disabled={isLoading} />
             </label>

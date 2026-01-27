@@ -1,4 +1,5 @@
 // src/views/DashboardView.tsx
+import { useMemo } from "react";
 import { PlanResult } from "../types";
 import { 
   PlayCircle, 
@@ -6,7 +7,8 @@ import {
   ClipboardCheck, 
   Activity, 
   CalendarCheck,
-  Zap
+  Zap,
+  Factory
 } from "lucide-react";
 
 interface DashboardProps {
@@ -25,6 +27,14 @@ export const DashboardView = ({ planResult, onEjecutarPlan }: DashboardProps) =>
     return diaAnt === diaSug;
   }).length;
 
+  const cargaPorPlanta = useMemo(() => {
+    const conteo: Record<string, number> = {};
+    planResult.forEach(r => {
+      conteo[r.planta] = (conteo[r.planta] || 0) + 1;
+    });
+    return Object.entries(conteo).sort((a, b) => b[1] - a[1]);
+  }, [planResult]);
+
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       
@@ -36,11 +46,10 @@ export const DashboardView = ({ planResult, onEjecutarPlan }: DashboardProps) =>
               <span className="bg-pf-red text-white text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">
                 Sistema de Planificación
               </span>
-              <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest italic">v2.0</span>
             </div>
             <h2 className="text-4xl font-black mb-2 tracking-tighter uppercase italic">Panel de Control</h2>
             <p className="text-slate-400 font-medium max-w-md">
-              Generación de mantenimiento preventivo basado en el historial del mes anterior y cumplimiento SAP.
+              Generación de mantenimiento preventivo basado en el historial del mes anterior y cumplimiento.
             </p>
           </div>
           
@@ -124,6 +133,27 @@ export const DashboardView = ({ planResult, onEjecutarPlan }: DashboardProps) =>
           </div>
         </div>
       )}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-pf-border shadow-sm">
+        <h3 className="text-sm font-black text-slate-900 uppercase mb-6 flex items-center gap-2">
+          <Factory size={16} /> Distribución de Carga por Planta
+        </h3>
+        <div className="space-y-4">
+          {cargaPorPlanta.map(([planta, cantidad]) => (
+            <div key={planta} className="space-y-1">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-wider">
+                <span>{planta}</span>
+                <span>{cantidad} OTs</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-pf-red h-full transition-all duration-1000" 
+                  style={{ width: `${(cantidad / planResult.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

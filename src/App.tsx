@@ -24,6 +24,8 @@ import { processSeguimiento } from "./logic/seguimientoProcessor";
 import { SeguimientoView } from "./views/SeguimientoView";
 import { SeguimientoResult } from "./types";
 import { ClipboardList } from "lucide-react";
+import { processSeguimientoOTs } from "./logic/seguimientoOTsProcessor"; // Nuevo
+import { SeguimientoOTsView } from "./views/SeguimientoOTsView";       // Nuevo
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
@@ -32,6 +34,8 @@ function App() {
   const [horariosResult, setHorariosResult] = useState<HorarioTecnico[]>([]);
   const [workbookActual, setWorkbookActual] = useState<XLSX.WorkBook | null>(null);
   const [plantas] = useState(["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "SADEMA"]);
+
+  const [empleadosMap, setEmpleadosMap] = useState<Map<string, any>>(new Map());
   
   const [archivoCargado, setArchivoCargado] = useState(false);
   const [atrasosResult, setAtrasosResult] = useState<AtrasoRow[]>([]);
@@ -47,18 +51,26 @@ function App() {
   const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // src/App.tsx
 
-    if (tipo === 'PLAN') setCargandoPlan(true);
-    else if (tipo === 'SEGUIMIENTO') setCargandoSeguimiento(true);
-    else setCargandoAtrasos(true);
+const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+  // 1. Activamos el estado de carga inmediatamente
+  if (tipo === 'PLAN') setCargandoPlan(true);
+  else if (tipo === 'SEGUIMIENTO') setCargandoSeguimiento(true);
+  else setCargandoAtrasos(true);
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    // 2. Usamos setTimeout para que el hilo de ejecución se libere 
+    // y permita a React renderizar el "Loading" antes del proceso pesado
+    setTimeout(() => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        
+        // Esta línea es la que más congela el hilo:
         const workbook = XLSX.read(data, { type: "array" });
 
         if (tipo === 'PLAN') {
@@ -67,35 +79,34 @@ function App() {
           setDatosCrudos(normalizarColumnas(rawAct));
           setHorariosResult(obtenerHorariosPorPlanta(workbook, plantaHorarios));
           setArchivoCargado(true);
-          // Opcional: Limpiar resultados de planes anteriores al cargar nuevo archivo
           setPlanResult([]);
         } else if (tipo === 'ATRASOS') {
-          setAtrasosResult(processAtrasos(workbook.Sheets));
+          const { actual, anterior } = processSeguimientoOTs(workbook.Sheets);
+          setAtrasosResult(actual);
+          setAtrasosAnterior(anterior);
           setActiveTab("atrasos");
         } else if (tipo === 'ANTERIOR') {
-          setAtrasosAnterior(processAtrasos(workbook.Sheets));
+          setAtrasosAnterior(processSeguimientoOTs(workbook.Sheets));
         } else if (tipo === 'SEGUIMIENTO') {
           const resultados = processSeguimiento(workbook.Sheets);
           setSeguimientoResult(resultados);
-          
-          // IMPORTANTE: Si hay datos, cambiar la vista automáticamente
           if (resultados.mantencion.length > 0 || resultados.infraestructura.length > 0) {
-            setActiveTab("seguimiento"); 
-          } else {
-            alert("El archivo se leyó, pero no se encontraron filas válidas según la lógica (Hojas STGO, PF1, etc).");
+            setActiveTab("seguimiento");
           }
         }
       } catch (e) {
-        console.error("Error al procesar:", e);
+        console.error("Error:", e);
         alert("Error al leer el archivo.");
       } finally {
+        // 3. Apagamos cargas
         setCargandoPlan(false);
         setCargandoAtrasos(false);
         setCargandoSeguimiento(false);
       }
-    };
-    reader.readAsArrayBuffer(file);
+    }, 100); // Pequeño margen para asegurar el renderizado
   };
+  reader.readAsArrayBuffer(file);
+};
 
   const limpiarDatos = () => {
     setWorkbookActual(null);
@@ -117,9 +128,11 @@ function App() {
   // Función para ejecutar la lógica del Planner
   const ejecutarPlanificacion = () => {
     if (workbookActual) {
-      // processExcelData internamente usará la clase Planner que ya modificamos
-      const resultados = processExcelData(workbookActual.Sheets);
+      // Capturamos el objeto retornado (resultados y el mapa)
+      const { resultados, empleadosMap: mapaCargado } = processExcelData(workbookActual.Sheets);
+      
       setPlanResult(resultados);
+      setEmpleadosMap(mapaCargado); // Guardamos el mapa en el estado
     }
   };
 
@@ -182,6 +195,8 @@ function App() {
                   plantas={plantas}
                   plantaSeleccionada={plantaPlan}
                   onCambiarPlanta={setPlantaPlan}
+                  empleadosMap={empleadosMap}
+                  setPlanResult={setPlanResult}
                 />
               )}
               {activeTab === "gantt" && (
@@ -196,9 +211,10 @@ function App() {
           )}
           
           {activeTab === "atrasos" && atrasosResult.length > 0 && (
-            <AtrasosView 
+            <SeguimientoOTsView 
               data={atrasosResult} 
-              dataAnterior={atrasosAnterior} 
+              dataAnterior={atrasosAnterior}
+              
             />
           )}
 
