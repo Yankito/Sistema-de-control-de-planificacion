@@ -1,4 +1,17 @@
+import { useMemo } from "react"; 
 import { X, Move, User, Info, Calendar } from "lucide-react";
+
+// --- Helpers ---
+const getWeekNumber = (d: Date) => {
+  const inicioSemana1 = new Date(2026, 0, 5); 
+  const fechaActual = new Date(d);
+  fechaActual.setHours(0, 0, 0, 0);
+  inicioSemana1.setHours(0, 0, 0, 0);
+  const diffTime = fechaActual.getTime() - inicioSemana1.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 0;
+  return Math.floor(diffDays / 7) + 1;
+};
 
 interface PanelLateralProps {
   diaSeleccionado: string | null;
@@ -8,6 +21,7 @@ interface PanelLateralProps {
   handleDragStart: (e: React.DragEvent, ot: any) => void;
   handleDragEnd: () => void;
   plantaSeleccionada: string;
+  onEditTecnicos: (orden: any) => void; // <--- 1. AGREGAR A LA INTERFAZ
 }
 
 export const PanelLateral = ({
@@ -17,18 +31,44 @@ export const PanelLateral = ({
   planResultSinAsignar,
   handleDragStart,
   handleDragEnd,
-  plantaSeleccionada
+  plantaSeleccionada,
+  onEditTecnicos // <--- 2. RECIBIR AQUÍ
 }: PanelLateralProps) => {
+
+  const ordenesVisualizadas = useMemo(() => {
+    if (!diaSeleccionado) return [];
+    if (diaSeleccionado.startsWith("WEEK-")) {
+      const semanaNum = parseInt(diaSeleccionado.split("-")[1]);
+      const todasLasOrdenes: any[] = [];
+      Object.keys(ordenesPorDia).forEach((fecha) => {
+        const [d, m, y] = fecha.split("/").map(Number);
+        const fechaObj = new Date(y, m - 1, d);
+        const semanaDeLaOrden = getWeekNumber(fechaObj);
+        if (semanaDeLaOrden === semanaNum) {
+          todasLasOrdenes.push(...ordenesPorDia[fecha]);
+        }
+      });
+      return todasLasOrdenes;
+    }
+    return ordenesPorDia[diaSeleccionado] || [];
+  }, [diaSeleccionado, ordenesPorDia]);
+
+  const tituloPanel = useMemo(() => {
+    if (!diaSeleccionado) return "Pendientes";
+    if (diaSeleccionado.startsWith("WEEK-")) return `Semana ${diaSeleccionado.split("-")[1]}`;
+    return `Día ${parseInt(diaSeleccionado.split('/')[0])}`;
+  }, [diaSeleccionado]);
+
   return (
     <div className="w-96 flex flex-col">
       <div className="bg-white rounded-[2.5rem] border border-pf-border shadow-xl flex-1 flex flex-col overflow-hidden">
         <div className="p-6 border-b flex justify-between items-center bg-slate-900 text-white">
           <div>
             <h4 className="font-black uppercase tracking-tighter text-lg leading-none">
-              {diaSeleccionado ? `Día ${parseInt(diaSeleccionado.split('/')[0])}` : "Pendientes"}
+              {tituloPanel}
             </h4>
-            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
-              {diaSeleccionado ? "Órdenes de trabajo" : "Sin turno de noche"}
+            <p className="text-[10px] font-bold text-slate-200 uppercase mt-1">
+              {diaSeleccionado ? `${ordenesVisualizadas.length} Órdenes Asignadas` : "Sin turno de noche"}
             </p>
           </div>
           {diaSeleccionado && (
@@ -38,29 +78,32 @@ export const PanelLateral = ({
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
           {diaSeleccionado ? (
-            ordenesPorDia[diaSeleccionado]?.map((orden: any, i: number) => (
-              <TarjetaOrden 
-                key={i} 
-                orden={orden} 
-                handleDragStart={handleDragStart} 
-                handleDragEnd={handleDragEnd} 
-                esAsignada={true}
-              />
-            ))
+            ordenesVisualizadas.length > 0 ? (
+              ordenesVisualizadas.map((orden: any, i: number) => (
+                <TarjetaOrden 
+                  key={`${orden.nroOrden}-${i}`} 
+                  orden={orden} 
+                  handleDragStart={handleDragStart} 
+                  handleDragEnd={handleDragEnd} 
+                  esAsignada={true}
+                  onEditTecnicos={onEditTecnicos} // <--- 3. PASAR A LA TARJETA
+                />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 opacity-60">
+                 <Calendar size={40} className="mb-2 stroke-1" />
+                 <span className="text-xs font-bold uppercase tracking-wider">Sin órdenes esta semana</span>
+              </div>
+            )
           ) : (
             planResultSinAsignar.map((ot: any, i: number) => (
               <TarjetaOrden 
                 key={i} 
                 orden={{
-                  // PRIORIDAD 1: Llaves ya procesadas por el Service (planas)
-                  // PRIORIDAD 2: Llaves originales de Excel (si el Service falló o es OT Nueva)
                   nroOrden: ot.nroOrden || ot["PEDIDO DE TRABAJO"] || `PEND-${i}`,
                   equipo: ot.equipo || ot["NÚMERO DE ACTIVO"] || "SIN ACTIVO",
                   descripcion: ot.descripcion || ot["DESCRIPCIÓN"] || "SIN DESCRIPCIÓN",
-                  
-                  // Manejo de técnicos
                   tecnicos: ot.tecnicos || [{ nombre: ot.mecanico || "SIN ASIGNAR", rol: ot.rol || "M" }],
-                  
                   planta: ot.planta || plantaSeleccionada,
                   fechaAnterior: ot.fechaAnterior || "N/A",
                   error: ot.error
@@ -68,6 +111,7 @@ export const PanelLateral = ({
                 handleDragStart={handleDragStart} 
                 handleDragEnd={handleDragEnd} 
                 esAsignada={false}
+                onEditTecnicos={onEditTecnicos} // <--- 3. PASAR A LA TARJETA (Opcional si quieres editar pendientes)
               />
             ))
           )}
@@ -86,8 +130,8 @@ export const PanelLateral = ({
   );
 };
 
-const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada }: any) => {
-  // Extraemos la lista de técnicos (si no existe, creamos un array con el técnico individual por compatibilidad)
+// --- Componente TarjetaOrden ---
+const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEditTecnicos }: any) => {
   const listaTecnicos = Array.isArray(orden.tecnicos) 
     ? orden.tecnicos 
     : [{ nombre: orden.mecanico || "SIN ASIGNAR", rol: orden.rol || "M" }];
@@ -118,23 +162,42 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada }: any
       <p className="font-bold text-slate-800 text-sm leading-tight mb-3 pl-2">{orden.descripcion}</p>
       
       <div className="pl-2 space-y-2">
-        {/* LISTA DE TÉCNICOS EN LA CUADRILLA */}
         <div className="flex flex-col gap-1">
           {listaTecnicos.map((tec: any, idx: number) => (
-            <div key={idx} className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase">
-              <User size={10} className={tec.rol === 'E' ? "text-yellow-500" : "text-blue-500"} /> 
-              <span className={tec.nombre === "SIN ASIGNAR" || tec.nombre === "SIN HISTORIAL" ? "text-slate-300 italic" : ""}>
-                {tec.nombre}
-              </span>
+            <div key={idx} className="flex items-center justify-between"> 
+                <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase">
+                    <User size={10} className={tec.rol === 'E' ? "text-yellow-500" : "text-blue-500"} /> 
+                    <span className={tec.nombre === "VACANTE" ? "text-amber-500 font-black" : ""}>
+                    {tec.nombre}
+                    </span>
+                </div>
             </div>
           ))}
+          
+          {/* BOTÓN "CAMBIAR TÉCNICOS" */}
+          {esAsignada && (
+              <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    // --- 4. AQUI SE EJECUTA LA FUNCIÓN ---
+                    if (onEditTecnicos) onEditTecnicos(orden);
+                }}
+                className="mt-2 w-full text-[9px] font-bold text-slate-400 bg-slate-50 hover:bg-slate-100 hover:text-pf-red py-1 rounded border border-slate-200 transition-colors"
+              >
+                Cambiar Técnicos
+              </button>
+          )}
         </div>
         
-        {/* FECHA ANTERIOR */}
-        {orden.fechaAnterior && orden.fechaAnterior !== "N/A" && (
+        {orden.fechaAnterior && orden.fechaAnterior !== "N/A" ? (
           <div className="flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg w-fit mt-1">
             <Calendar size={10} />
             <span>Última vez: {orden.fechaAnterior}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg w-fit mt-1">
+            <Calendar size={10} />
+            <span>Sin fecha anterior - {orden.fechaSugerida || "N/A"}</span>
           </div>
         )}
       </div>

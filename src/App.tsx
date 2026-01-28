@@ -5,7 +5,8 @@ import * as XLSX from "xlsx";
 import { 
   processExcelData, 
   obtenerHorariosPorPlanta, 
-  normalizarColumnas,   
+  normalizarColumnas, 
+  obtenerMapaHorarios  
 } from "./logic/excelProcessor";
 import { PlannerService } from "./logic/PlannerService";
 import { PlanResult, HorarioTecnico } from "./types";
@@ -19,9 +20,9 @@ import { SeguimientoOTsView } from "./views/SeguimientoOTsView";
 import { processSeguimiento } from "./logic/seguimientoProcessor";
 import { SeguimientoView } from "./views/SeguimientoView";
 import { SeguimientoResult } from "./types";
-import { FileSpreadsheet } from "lucide-react";
 import { AtrasoRow } from "./logic/atrasosProcessor";
-import {obtenerMapaHorarios} from "./logic/excelProcessor";
+// IMPORTAR EL MODAL
+import { ModalAsignacionTecnico } from './components/planificacion/ModalAsignacionTecnico';
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
@@ -43,6 +44,11 @@ function App() {
   const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
   const [mapaHorariosActual, setMapaHorariosActual] = useState<Map<string, string[]>>(new Map());
+  const [listaEmpleadosArray, setListaEmpleadosArray] = useState<any[]>([]); // Para el modal
+
+  // ESTADOS PARA EL MODAL DE ASIGNACIÓN
+  const [modalTecnicoOpen, setModalTecnicoOpen] = useState(false);
+  const [ordenEditando, setOrdenEditando] = useState<any>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => {
     const file = e.target.files?.[0];
@@ -110,23 +116,29 @@ function App() {
     }
   };
 
-  const ejecutarPlanificacion = () => {
+  // --- EJECUCIÓN DE PLANIFICACIÓN (AHORA CON MODO) ---
+  const ejecutarPlanificacion = (modo: 'STRICT' | 'BALANCED') => {
     if (workbookActual) {
-      const { resultados, sinAsignar, empleadosMap: mapaCargado } = processExcelData(workbookActual.Sheets);
+      // NOTA: Debes actualizar processExcelData para que acepte el 'modo' y llame al servicio correcto
+      // @ts-ignore (Ignoramos TS hasta que actualices excelProcessor)
+      const { resultados, sinAsignar, empleadosMap: mapaCargado } = processExcelData(workbookActual.Sheets, modo);
       const horarios = obtenerMapaHorarios(workbookActual.Sheets);
       
       setPlanResult(resultados);
       setPlanResultSinAsignar(sinAsignar);
       setEmpleadosMap(mapaCargado);
-      setMapaHorariosActual(horarios); // Guardamos para el Drag & Drop
+      setMapaHorariosActual(horarios);
+      
+      // Convertir mapa a array para el modal
+      setListaEmpleadosArray(Array.from(mapaCargado.values()));
     }
   };
 
+  // --- MANEJO DE CAMBIO DE TURNO (HORARIOS VIEW) ---
   const handleCambioTurno = (nombreTecnico: string, diaIndex: number) => {
     setHorariosResult((prev) => {
       return prev.map((tecnico) => {
         if (tecnico.nombre === nombreTecnico) {
-          // Ciclo de turnos: M -> T -> N -> L -> V -> M
           const ciclo = ['M', 'T', 'N', 'L', 'V'];
           const turnoActual = tecnico.turnos[diaIndex];
           const siguienteIndex = (ciclo.indexOf(turnoActual) + 1) % ciclo.length;
@@ -142,6 +154,64 @@ function App() {
     });
   };
 
+  // --- MANEJO DE ASIGNACIÓN DE TÉCNICO (MODAL) ---
+  const handleAsignarTecnico = (nroOrden: string, indexTecnico: number, nuevoNombre: string) => {
+    setPlanResult(prev => prev.map(ot => {
+        if (ot.nroOrden === nroOrden) {
+            const nuevosTecnicos = [...ot.tecnicos];
+            nuevosTecnicos[indexTecnico] = {
+                ...nuevosTecnicos[indexTecnico],
+                nombre: nuevoNombre
+            };
+            return { ...ot, tecnicos: nuevosTecnicos };
+        }
+        return ot;
+    }));
+
+    // Actualizamos también la orden en edición para reflejar cambios en el modal inmediatamente
+    setOrdenEditando((prev: any) => {
+        if (!prev) return null;
+        const nuevos = [...prev.tecnicos];
+        nuevos[indexTecnico] = { ...nuevos[indexTecnico], nombre: nuevoNombre };
+        return { ...prev, tecnicos: nuevos };
+    });
+  };
+
+
+  const handleModificarCupos = (nroOrden: string, accion: 'ADD' | 'REMOVE', rol?: string, indice?: number) => {
+    // Función auxiliar para actualizar una orden específica
+    const actualizarOrden = (ot: any) => {
+        const nuevosTecnicos = [...ot.tecnicos];
+        
+        if (accion === 'ADD' && rol) {
+            // Agregamos un nuevo slot vacante con el rol pedido
+            nuevosTecnicos.push({
+                nombre: "VACANTE",
+                rol: rol,
+                turnos: null,
+                existe: true
+            });
+        } else if (accion === 'REMOVE' && typeof indice === 'number') {
+            // Eliminamos el slot del índice indicado
+            nuevosTecnicos.splice(indice, 1);
+        }
+        
+        return { ...ot, tecnicos: nuevosTecnicos };
+    };
+
+    // Actualizamos el estado principal (PlanResult)
+    setPlanResult(prev => prev.map(ot => 
+        ot.nroOrden === nroOrden ? actualizarOrden(ot) : ot
+    ));
+
+    // Y también actualizamos la orden que se está editando en el modal
+    setOrdenEditando((prev: any) => {
+        if (prev && prev.nroOrden === nroOrden) {
+            return actualizarOrden(prev);
+        }
+        return prev;
+    });
+  };
 
   return (
     <div className="flex h-screen bg-pf-light text-slate-800 font-sans">
@@ -170,7 +240,12 @@ function App() {
                   }}
                 />
               </div>
-              {archivoCargado && <DashboardView planResult={planResult} onEjecutarPlan={ejecutarPlanificacion} />}
+              {archivoCargado && (
+                <DashboardView 
+                  planResult={planResult} 
+                  onEjecutarPlan={ejecutarPlanificacion} 
+                />
+              )}
             </div>
           )}
           {archivoCargado && (
@@ -187,23 +262,22 @@ function App() {
               {activeTab === "plan" && (
                 <PlanificacionView 
                   planResult={planResult.filter(p => p.planta === plantaPlan)}
-                  
-                  // Filtro para el Panel Lateral (Órdenes pendientes)
                   planResultSinAsignar={planResultSinAsignar.filter(o => {
-                    // 1. Intentamos obtener la planta desde el objeto ya procesado
                     if (o.planta) return o.planta === plantaPlan;
-                    
-                    // 2. Si es una OT Nueva/Sin procesar, mapeamos el departamento original
                     const deptoKey = Object.keys(o).find(k => k.includes("DEPARTAMENTO")) || "";
                     return PlannerService.mapDepartamentoAPlanta(o[deptoKey]) === plantaPlan;
                   })}
-                  
                   setPlanResult={setPlanResult}
                   plantas={plantas} 
                   plantaSeleccionada={plantaPlan} 
                   onCambiarPlanta={setPlantaPlan}
                   empleadosMap={empleadosMap}
                   mapaHorarios={mapaHorariosActual}
+                  // Pasamos la función para abrir el modal
+                  onEditTecnicos={(orden: any) => {
+                      setOrdenEditando(orden);
+                      setModalTecnicoOpen(true);
+                  }}
                 />
               )}
 
@@ -222,7 +296,22 @@ function App() {
           {activeTab === "seguimiento" && <SeguimientoView dataMantencion={seguimientoResult.mantencion} dataInfra={seguimientoResult.infraestructura} />}
         </section>
       </main>
+
+      <ModalAsignacionTecnico
+        isOpen={modalTecnicoOpen}
+        onClose={() => setModalTecnicoOpen(false)}
+        orden={ordenEditando}
+        fecha={ordenEditando?.fechaSugerida || ""}
+        empleados={Array.from(empleadosMap.values()).map((v: any, i) => ({
+             ...v, 
+             key: Array.from(empleadosMap.keys())[i]
+        }))} 
+        mapaHorarios={mapaHorariosActual} 
+        onAsignar={handleAsignarTecnico}
+        onModificarCupos={handleModificarCupos}
+      />
     </div>
+    
   );
 }
 

@@ -1,3 +1,4 @@
+// src/logic/excelProcessor.ts
 import * as XLSX from "xlsx";
 import { PlannerService } from "./PlannerService";
 import { HorarioTecnico } from "../types";
@@ -33,7 +34,11 @@ export const obtenerMapaHorarios = (sheets: { [key: string]: XLSX.WorkSheet }): 
   return mapa;
 };
 
-export const processExcelData = (sheets: { [key: string]: XLSX.WorkSheet }) => {
+// --- CAMBIO PRINCIPAL AQUÍ ---
+export const processExcelData = (
+  sheets: { [key: string]: XLSX.WorkSheet }, 
+  modo: 'STRICT' | 'BALANCED' = 'STRICT' // Recibimos el modo (por defecto STRICT)
+) => {
   const dfAnt = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["B.ANT"]));
   const dfAct = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["B.ACT"]));
   const dfCumplimiento = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["CUMPLIMIENTO"]));
@@ -52,17 +57,31 @@ export const processExcelData = (sheets: { [key: string]: XLSX.WorkSheet }) => {
 
   const mapaHorarios = obtenerMapaHorarios(sheets);
 
-  const { resultados, sinAsignar } = PlannerService.generarPlanificacion(
-    dfAct, 
-    dfAnt, 
-    dfCumplimiento, 
-    empleadosMap, 
-    mapaHorarios
-  );
+  // DECIDIR QUÉ ALGORITMO EJECUTAR
+  let resultadoPlanificacion;
+
+  if (modo === 'BALANCED') {
+    // Modo Nuevo: Carga Equilibrada
+    resultadoPlanificacion = PlannerService.generarPlanificacionEquilibrada(
+      dfAct, 
+      dfAnt, 
+      dfCumplimiento, 
+      empleadosMap
+    );
+  } else {
+    // Modo Original: Prioridad Turnos (STRICT)
+    resultadoPlanificacion = PlannerService.generarPlanificacion(
+      dfAct, 
+      dfAnt, 
+      dfCumplimiento, 
+      empleadosMap, 
+      mapaHorarios
+    );
+  }
   
   return {
-    resultados,
-    sinAsignar,
+    resultados: resultadoPlanificacion.resultados,
+    sinAsignar: resultadoPlanificacion.sinAsignar,
     empleadosMap
   };
 };

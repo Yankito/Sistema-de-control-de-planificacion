@@ -10,9 +10,9 @@ export const PlanificacionView = ({
   onCambiarPlanta, 
   empleadosMap, 
   planResultSinAsignar,
-  mapaHorarios 
+  mapaHorarios,
+  onEditTecnicos
 }: any) => {
-  const [viewMode, setViewMode] = useState<"table" | "grid" | "calendar">("calendar");
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
   const [draggingOT, setDraggingOT] = useState<any>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
@@ -114,8 +114,6 @@ export const PlanificacionView = ({
         plantaSeleccionada={plantaSeleccionada}
         plantas={plantas}
         onCambiarPlanta={onCambiarPlanta}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
         diaSeleccionado={diaSeleccionado}
         setDiaSeleccionado={setDiaSeleccionado}
         draggingOT={draggingOT}
@@ -135,6 +133,7 @@ export const PlanificacionView = ({
         handleDragStart={handleDragStart}
         handleDragEnd={handleDragEnd}
         plantaSeleccionada={plantaSeleccionada}
+        onEditTecnicos={onEditTecnicos}
       />
     </div>
   );
