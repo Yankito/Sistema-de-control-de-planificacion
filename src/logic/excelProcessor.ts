@@ -1,4 +1,3 @@
-// src/logic/excelProcessor.ts
 import * as XLSX from "xlsx";
 import { PlannerService } from "./PlannerService";
 import { HorarioTecnico } from "../types";
@@ -13,6 +12,25 @@ export const normalizarColumnas = (df: any[]) => {
     });
     return newRow;
   });
+};
+
+export const obtenerMapaHorarios = (sheets: { [key: string]: XLSX.WorkSheet }): Map<string, string[]> => {
+  const sheet = sheets["HORARIOS"];
+  if (!sheet) return new Map();
+
+  const dfHorarios = XLSX.utils.sheet_to_json(sheet) as Record<string, any>[];
+  const mapa = new Map<string, string[]>();
+
+  dfHorarios.forEach(fila => {
+    const entries = Object.entries(fila);
+    if (entries.length > 0) {
+      const nombreTec = String(entries[0][1]).trim().toUpperCase();
+      const turnos = entries.slice(1, 32).map(entry => String(entry[1] || "L").trim().toUpperCase());
+      mapa.set(nombreTec, turnos);
+    }
+  });
+
+  return mapa;
 };
 
 export const processExcelData = (sheets: { [key: string]: XLSX.WorkSheet }) => {
@@ -32,15 +50,23 @@ export const processExcelData = (sheets: { [key: string]: XLSX.WorkSheet }) => {
     }
   });
 
-  const resultados = PlannerService.generarPlanificacion(dfAct, dfAnt, dfCumplimiento, empleadosMap);
+  const mapaHorarios = obtenerMapaHorarios(sheets);
+
+  const { resultados, sinAsignar } = PlannerService.generarPlanificacion(
+    dfAct, 
+    dfAnt, 
+    dfCumplimiento, 
+    empleadosMap, 
+    mapaHorarios
+  );
   
   return {
     resultados,
+    sinAsignar,
     empleadosMap
   };
 };
 
-// Re-incorporamos esta función aquí ya que es lectura pura de Workbook
 export const obtenerHorariosPorPlanta = (workbook: XLSX.WorkBook, plantaSel: string): HorarioTecnico[] => {
   const sheet = workbook.Sheets["HORARIOS"];
   const sheetEmp = workbook.Sheets["EMPLEADOS"];

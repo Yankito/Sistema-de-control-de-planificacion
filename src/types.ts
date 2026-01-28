@@ -4,12 +4,16 @@ export interface PlanResult {
   equipo: string;
   descripcion: string;
   planta: string;
-  mecanico: string;
-  rol: string;
+  tecnicos: {
+    nombre: string;
+    rol: string;
+    turnos?: string[] | null;
+    existe?: boolean;
+  }[];
   fechaSugerida: string;
   fechaAnterior: string;
+  error?: string;
 }
-
 export interface HorarioTecnico {
   nombre: string;
   rol: string;

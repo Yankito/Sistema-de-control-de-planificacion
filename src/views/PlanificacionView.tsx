@@ -1,23 +1,33 @@
-// src/views/PlanificacionView.tsx
-import { useState, useMemo } from "react";
-import { DataTable } from "../components/DataTable";
-import { 
-  LayoutGrid, 
-  List, 
-  CalendarDays, 
-  X,
-  Wrench,
-  Zap,
-  Calendar as CalendarIcon,
-  User
-} from "lucide-react";
-import { RefreshCw, Calendar as CalendarEdit, UserPlus } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Calendario } from "../components/planificacion/Calendario";
+import { PanelLateral } from "../components/planificacion/PanelLateral";
 
-export const PlanificacionView = ({ planResult, plantaSeleccionada, plantas, onCambiarPlanta, empleadosMap, setPlanResult }: any) => {
+export const PlanificacionView = ({ 
+  planResult, 
+  setPlanResult, 
+  plantaSeleccionada, 
+  plantas, 
+  onCambiarPlanta, 
+  empleadosMap, 
+  planResultSinAsignar,
+  mapaHorarios 
+}: any) => {
   const [viewMode, setViewMode] = useState<"table" | "grid" | "calendar">("calendar");
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
+  const [draggingOT, setDraggingOT] = useState<any>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // 1. Ordenamiento de datos por fecha
+  useEffect(() => {
+    const preventDefault = (e: Event) => e.preventDefault();
+    document.addEventListener('dragover', preventDefault);
+    document.addEventListener('drop', preventDefault);
+    return () => {
+      document.removeEventListener('dragover', preventDefault);
+      document.removeEventListener('drop', preventDefault);
+    };
+  }, []);
+
   const datosOrdenados = useMemo(() => {
     return [...planResult].sort((a, b) => {
       const [dA, mA, aA] = a.fechaSugerida.split('/');
@@ -26,7 +36,6 @@ export const PlanificacionView = ({ planResult, plantaSeleccionada, plantas, onC
     });
   }, [planResult]);
 
-  // 2. Agrupación por fecha para el calendario
   const ordenesPorDia = useMemo(() => {
     return datosOrdenados.reduce((acc: any, orden: any) => {
       const fecha = orden.fechaSugerida;
@@ -36,244 +45,97 @@ export const PlanificacionView = ({ planResult, plantaSeleccionada, plantas, onC
     }, {});
   }, [datosOrdenados]);
 
-  // --- LÓGICA MAPA DE CALOR (Para el Badge) ---
-  const maxOrdenes = useMemo(() => {
-    const conteos = Object.values(ordenesPorDia).map((v: any) => v.length);
-    return conteos.length > 0 ? Math.max(...conteos) : 0;
-  }, [ordenesPorDia]);
-
-  const getBadgeStyle = (cantidad: number) => {
-    if (cantidad === 0) return 'bg-transparent text-transparent';
-    
-    const porcentaje = (cantidad / maxOrdenes) * 100;
-    
-    // Escala de Rojo según saturación
-    if (porcentaje <= 25) return 'bg-red-50 text-red-500 border border-red-100';
-    if (porcentaje <= 50) return 'bg-red-100 text-red-700 border border-red-200';
-    if (porcentaje <= 75) return 'bg-red-500 text-white shadow-sm';
-    return 'bg-pf-red text-white shadow-md animate-pulse-subtle';
+  // --- LOGICA DRAG & DROP ---
+  const handleDragStart = (e: React.DragEvent, ot: any) => {
+    e.dataTransfer.setData("text/plain", JSON.stringify(ot));
+    e.dataTransfer.effectAllowed = "move";
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+    setDraggingOT(ot);
   };
 
-  // --- LÓGICA DE CALENDARIO (Días y Huecos) ---
-  const { diasMes, espaciosVacios } = useMemo(() => {
-    if (!planResult || planResult.length === 0) return { diasMes: [], espaciosVacios: [] };
+  const handleDragEnd = () => {
+    setDraggingOT(null);
+    setDragOverDate(null);
+  };
+
+  const handleDragEnter = (e: React.DragEvent, fecha: string) => {
+    e.preventDefault();
+    setDragOverDate(fecha);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent, fechaDestino: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggingOT) return;
     
-    const [,, anio] = datosOrdenados[0].fechaSugerida.split('/').map(Number);
-    const [, mes] = datosOrdenados[0].fechaSugerida.split('/').map(Number);
+    const existeEnPlan = planResult.some((p: any) => p.nroOrden === draggingOT.nroOrden);
+    if (existeEnPlan) {
+      setPlanResult(planResult.map((p: any) => 
+        p.nroOrden === draggingOT.nroOrden ? { ...p, fechaSugerida: fechaDestino } : p
+      ));
+    } else {
+      setPlanResult([...planResult, { ...draggingOT, fechaSugerida: fechaDestino }]);
+    }
+    
+    setDraggingOT(null);
+    setDragOverDate(null);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 2000);
+  };
 
-    // Ajuste: 1 de Febrero 2026 es Domingo (Index 0 en JS, queremos que sea el 7mo lugar)
-    const primerDiaFecha = new Date(anio, mes - 1, 1);
-    let firstDayIndex = primerDiaFecha.getDay() - 1; // Lunes = 0
-    if (firstDayIndex === -1) firstDayIndex = 6;     // Domingo = 6
+  const isNocheValid = (tecnicos: any[], fechaStr: string) => {
+    if (!mapaHorarios || !tecnicos || tecnicos.length === 0) return false;
+    
+    // Verificamos CADA técnico del grupo
+    return tecnicos.every((tec: any) => {
+       // Si es "OT NUEVA" o "SIN HISTORIAL", asumimos que es válido para no bloquear
+       if (tec.nombre === "OT NUEVA" || tec.nombre === "SIN HISTORIAL") return true;
 
-    const ultimoDia = new Date(anio, mes, 0).getDate();
-    const dias = Array.from({ length: ultimoDia }, (_, i) => {
-      const d = (i + 1).toString().padStart(2, '0');
-      const m = mes.toString().padStart(2, '0');
-      return `${d}/${m}/${anio}`;
+       const turnos = mapaHorarios.get(tec.nombre);
+       if (!turnos) return false; // Si no tiene turnos cargados, falla
+       
+       const dia = parseInt(fechaStr.split('/')[0]);
+       return turnos[dia - 1]?.trim().toUpperCase() === 'N';
     });
-
-    return { diasMes: dias, espaciosVacios: Array.from({ length: firstDayIndex }) };
-  }, [planResult, datosOrdenados]);
-
-  const obtenerPeriodo = () => {
-    if (planResult.length === 0) return "Sin Datos";
-    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const [,, anio] = planResult[0].fechaSugerida.split('/');
-    const [, mes] = planResult[0].fechaSugerida.split('/').map(Number);
-    return `${meses[mes - 1]} ${anio}`;
-  };
-
-  const renderRolBadge = (rol: string) => {
-    const isElectrico = rol?.toLowerCase() === 'e';
-    const isMecanico = rol?.toLowerCase() === 'm';
-    const base = "flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border";
-    if (isElectrico) return <span className={`${base} bg-yellow-50 text-yellow-600 border-yellow-100`}><Zap size={8} fill="currentColor" /> <span>Eléctrico</span></span>;
-    if (isMecanico) return <span className={`${base} bg-blue-50 text-blue-600 border-blue-100`}><Wrench size={8} fill="currentColor" /> <span>Mecánico</span></span>;
-    return <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">{rol}</span>;
-  };
-
-
-  // 1. Manejo de edición (Técnicos del mismo rol)
-  const listaTecnicosMismoRol = (rol: string) => {
-    return Array.from(empleadosMap.entries())
-      .filter(([_, datos]: any) => datos.rol === rol)
-      .map(([nombre]: any) => nombre);
-  };
-
-  const handleUpdateOrden = (nroOrden: string, nuevosDatos: any) => {
-    const nuevaPlan = planResult.map((p: any) => {
-      if (p.nroOrden === nroOrden) {
-        return { ...p, ...nuevosDatos };
-      }
-      return p;
-    });
-    setPlanResult(nuevaPlan);
-  };
-
-  const formatToInputDate = (fechaStr: string) => {
-    const [d, m, a] = fechaStr.split('/');
-    return `${a}-${m}-${d}`;
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* HEADER */}
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-pf-border shadow-sm">
-        <div className="flex items-center space-x-6">
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">Planificación</h3>
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button onClick={() => setViewMode("calendar")} className={`p-2 rounded-lg transition-all ${viewMode === "calendar" ? "bg-white text-pf-red shadow-sm" : "text-slate-400"}`}><CalendarDays size={20} /></button>
-            <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white text-pf-red shadow-sm" : "text-slate-400"}`}><LayoutGrid size={20} /></button>
-            <button onClick={() => setViewMode("table")} className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white text-pf-red shadow-sm" : "text-slate-400"}`}><List size={20} /></button>
-          </div>
-        </div>
-        <select value={plantaSeleccionada} onChange={(e) => onCambiarPlanta(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none hover:bg-white transition-colors">
-          {plantas.map((p: string) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-
-      {/* VISTA CALENDARIO */}
-      {viewMode === "calendar" && (
-        <div className="bg-white p-10 rounded-[3rem] border border-pf-border shadow-sm">
-          <div className="text-center mb-12">
-            <h4 className="text-4xl font-black text-slate-800 tracking-tighter italic uppercase">{obtenerPeriodo()}</h4>
-          </div>
-          <div className="grid grid-cols-7 gap-4">
-            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
-              <div key={d} className="text-center text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] mb-4">{d}</div>
-            ))}
-            
-            {espaciosVacios.map((_, i) => <div key={`empty-${i}`} className="aspect-square" />)}
-
-            {diasMes.map((fecha) => {
-              const cantidad = ordenesPorDia[fecha]?.length || 0;
-              const diaNum = parseInt(fecha.split('/')[0]);
-              
-              return (
-                <button 
-                  key={fecha} 
-                  onClick={() => setDiaSeleccionado(fecha)} 
-                  className="aspect-square group rounded-[2.5rem] border-2 border-white bg-white hover:bg-slate-50 hover:border-slate-100 transition-all flex flex-col items-center justify-center p-2"
-                >
-                  <span className={`text-3xl font-black transition-colors ${cantidad > 0 ? 'text-slate-800' : 'text-slate-200'}`}>
-                    {diaNum}
-                  </span>
-                  
-                  <div className={`mt-1 px-3 py-1 rounded-full font-black text-[10px] transition-all flex items-center gap-1 ${getBadgeStyle(cantidad)}`}>
-                    {cantidad > 0 && <span>{cantidad} {cantidad === 1 ? 'OT' : 'OTS'}</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* VISTA GRID */}
-      {viewMode === "grid" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {datosOrdenados.map((plan: any, i: number) => (
-            <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-pf-border shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2 bg-pf-red/[0.03] px-3 py-1.5 rounded-xl border border-pf-red/10">
-                  <CalendarIcon size={12} className="text-pf-red" />
-                  <span className="text-xs font-black text-pf-red">{plan.fechaSugerida}</span>
-                </div>
-                {renderRolBadge(plan.rol)}
-              </div>
-              <h4 className="font-black text-slate-800 text-lg leading-tight mb-6 min-h-[3rem] italic">{plan.descripcion}</h4>
-              <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-xs font-bold text-slate-600"><User size={14} /> <span>{plan.mecanico}</span></div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">OT {plan.nroOrden}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* VISTA TABLA */}
-      {viewMode === "table" && (
-        <div className="bg-white border border-pf-border rounded-3xl overflow-hidden shadow-sm">
-          <DataTable data={datosOrdenados} isPlan={true} />
-        </div>
-      )}
-
-      {/* MODAL DETALLE (CON EDICIÓN) */}
-      {diaSeleccionado && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setDiaSeleccionado(null)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl p-10 overflow-y-auto animate-in slide-in-from-right duration-500">
-            <div className="flex justify-between items-center mb-8 border-b pb-4">
-              <div>
-                <h4 className="text-3xl font-black text-slate-900 leading-none tracking-tighter uppercase italic">Día {parseInt(diaSeleccionado.split('/')[0])}</h4>
-                <p className="text-pf-red font-bold uppercase text-[10px] tracking-widest mt-2">Gestión de Intervenciones</p>
-              </div>
-              <button onClick={() => setDiaSeleccionado(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={32} className="text-slate-300" /></button>
-            </div>
-            
-            <div className="space-y-6">
-              {ordenesPorDia[diaSeleccionado]?.map((orden: any, i: number) => (
-                <div key={i} className="p-6 rounded-[2rem] bg-slate-50 border border-slate-200 shadow-sm relative group hover:border-pf-red transition-all">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[12px] font-black text-pf-red uppercase">OT: {orden.nroOrden}</p>
-                    {renderRolBadge(orden.rol)}
-                  </div>
-                  
-                  <p className="font-bold text-slate-800 leading-tight mb-4 italic">{orden.descripcion}</p>
-
-                  <div className="grid grid-cols-1 gap-3 pt-4 border-t border-slate-200">
-                    {/* CAMBIO DE FECHA */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
-                        <CalendarEdit size={10} /> Cambiar Fecha
-                      </label>
-                      <input 
-                        type="date" 
-                        // Aquí cargamos la fecha que ya tiene la OT por defecto
-                        defaultValue={formatToInputDate(orden.fechaSugerida)}
-                        className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none focus:ring-2 focus:ring-pf-red/20"
-                        onChange={(e) => {
-                          if (!e.target.value) return;
-                          const [y, m, d] = e.target.value.split('-');
-                          const nuevaFecha = `${d}/${m}/${y}`;
-                          
-                          // Actualizamos la OT en el estado global
-                          handleUpdateOrden(orden.nroOrden, { fechaSugerida: nuevaFecha });
-                          
-                          // Opcional: Si quieres que el modal se refresque al día actual o se cierre
-                          // setDiaSeleccionado(null); 
-                        }}
-                      />
-                    </div>
-
-                    {/* CAMBIO DE TÉCNICO */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
-                        <UserPlus size={10} /> Reasignar {orden.rol === 'M' ? 'Mecánico' : 'Eléctrico'}
-                      </label>
-                      <select 
-                        className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none appearance-none"
-                        value={orden.mecanico}
-                        onChange={(e) => handleUpdateOrden(orden.nroOrden, { mecanico: e.target.value })}
-                      >
-                        {listaTecnicosMismoRol(orden.rol).map(tec => (
-                          <option key={tec} value={tec}>{tec}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between opacity-60">
-                    <span className="text-[9px] bg-slate-200 px-2 py-0.5 rounded font-black italic">{orden.equipo}</span>
-                    <span className="text-[9px] font-bold">Ref: {orden.fechaAnterior}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex h-full gap-6 animate-in fade-in duration-500 relative select-none">
+      <Calendario 
+        planResult={planResult}
+        plantaSeleccionada={plantaSeleccionada}
+        plantas={plantas}
+        onCambiarPlanta={onCambiarPlanta}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        diaSeleccionado={diaSeleccionado}
+        setDiaSeleccionado={setDiaSeleccionado}
+        draggingOT={draggingOT}
+        handleDragEnter={handleDragEnter}
+        handleDragOver={handleDragOver}
+        handleDrop={handleDrop}
+        isNocheValid={isNocheValid}
+        showSuccess={showSuccess}
+        dragOverDate={dragOverDate}
+        ordenesPorDia={ordenesPorDia}
+      />
+      <PanelLateral 
+        diaSeleccionado={diaSeleccionado}
+        setDiaSeleccionado={setDiaSeleccionado}
+        ordenesPorDia={ordenesPorDia}
+        planResultSinAsignar={planResultSinAsignar}
+        handleDragStart={handleDragStart}
+        handleDragEnd={handleDragEnd}
+        plantaSeleccionada={plantaSeleccionada}
+      />
     </div>
   );
 };

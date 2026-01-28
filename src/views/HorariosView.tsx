@@ -1,22 +1,24 @@
-import { HorarioView } from "../components/HorarioView";
-import { HorarioTecnico } from "../logic/excelProcessor";
-import { Wrench, Zap, Users, Filter } from "lucide-react";
+import { HorarioView } from "../components/planificacion/HorarioView";
+import { HorarioTecnico } from "../types";
+import { Wrench, Zap, Users, Filter, Info } from "lucide-react"; // Agregué Info para el tip
 
 interface HorariosViewProps {
   horariosResult: HorarioTecnico[];
   plantas: string[];
   plantaSeleccionada: string;
   onCambiarPlanta: (planta: string) => void;
+  // NUEVA PROP
+  onCambioTurno: (nombre: string, diaIndex: number) => void;
 }
 
 export const HorariosView = ({ 
   horariosResult = [], 
   plantas = [], 
   plantaSeleccionada, 
-  onCambiarPlanta 
+  onCambiarPlanta,
+  onCambioTurno // Recibimos la función
 }: HorariosViewProps) => {
   
-  // Contadores precisos basados en el rol normalizado
   const totalMecanicos = horariosResult.filter(h => 
     h.rol?.toLowerCase() === 'm' || h.rol?.toLowerCase() === 'mecanico'
   ).length;
@@ -28,7 +30,7 @@ export const HorariosView = ({
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
-      {/* HEADER DE ESTADO Y FILTRO */}
+      {/* HEADER (Igual que tu código anterior) */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-8 rounded-[2.5rem] border border-pf-border shadow-sm gap-6">
         <div className="flex items-center space-x-6">
           <div className="bg-pf-red p-4 rounded-3xl shadow-lg shadow-pf-red/20">
@@ -51,6 +53,7 @@ export const HorariosView = ({
           </div>
         </div>
         
+        {/* SELECTOR PLANTA (Igual) */}
         <div className="flex flex-col w-full lg:w-72">
           <label className="text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 flex items-center">
             <Filter size={10} className="mr-1" /> Seleccionar Planta
@@ -74,24 +77,34 @@ export const HorariosView = ({
         </div>
       </div>
 
-      {/* LEYENDA RÁPIDA DE TURNOS (Diseño mejorado) */}
-      <div className="flex flex-wrap gap-6 px-6 py-2">
-         {[
-           { label: 'Mañana', color: 'bg-blue-500', code: 'M' },
-           { label: 'Tarde', color: 'bg-orange-500', code: 'T' },
-           { label: 'Noche', color: 'bg-slate-800', code: 'N' },
-           { label: 'Vacaciones', color: 'bg-emerald-500', code: 'V' }
-         ].map(item => (
-           <div key={item.code} className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{item.label} ({item.code})</span>
-           </div>
-         ))}
+      {/* LEYENDA E INSTRUCCIÓN */}
+      <div className="flex justify-between items-center px-4">
+        <div className="flex flex-wrap gap-6 px-2 py-2">
+           {[
+             { label: 'Mañana', color: 'bg-blue-500', code: 'M' },
+             { label: 'Tarde', color: 'bg-orange-500', code: 'T' },
+             { label: 'Noche', color: 'bg-slate-800', code: 'N' },
+             { label: 'Vacaciones', color: 'bg-emerald-500', code: 'V' }
+           ].map(item => (
+             <div key={item.code} className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{item.label} ({item.code})</span>
+             </div>
+           ))}
+        </div>
+        
+        <div className="flex items-center gap-2 text-slate-400">
+          <Info size={14} />
+          <span className="text-[10px] font-bold uppercase">Haz clic en una celda para cambiar turno</span>
+        </div>
       </div>
 
       {/* VISTA GANTT PRINCIPAL */}
       <div className="bg-white rounded-[3rem] border border-pf-border shadow-md shadow-slate-200/50 overflow-hidden">
-        <HorarioView horarios={horariosResult} />
+        <HorarioView 
+          horarios={horariosResult} 
+          onCambioTurno={onCambioTurno} // Pasamos la función al componente visual
+        />
       </div>
     </div>
   );
