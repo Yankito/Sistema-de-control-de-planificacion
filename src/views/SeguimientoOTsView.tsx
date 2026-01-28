@@ -17,7 +17,7 @@ export const SeguimientoOTsView = ({ data, dataAnterior = [] }: { data: AtrasoRo
   const [pagina, setPagina] = useState(1);
   const itemsPorPagina = 10;
 
-  const listaPlantas = ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"];
+  const listaPlantas = ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS"];
 
   const dataModo = useMemo(() => data.filter(d => modoVista === "CUMPLIDAS" ? d.clasificacion === "CUMPLIDA" : d.clasificacion !== "CUMPLIDA"), [data, modoVista]);
 

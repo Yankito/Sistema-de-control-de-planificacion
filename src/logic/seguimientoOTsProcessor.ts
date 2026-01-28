@@ -25,7 +25,7 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
 
   // --- PARTE 2: PROCESAR DATA ACTUAL ---
   const resultados: AtrasoRow[] = [];
-  const hojasPlantas = ["PF1", "PF2", "MP3"];
+  const hojasPlantas = ["PF1", "PF2", "MP3", "MPS"];
   
   if (!sheets["CUMPLIMIENTO"] || !sheets["MASIVO"]) {
       return { actual: resultados, anterior: dataAnterior };
