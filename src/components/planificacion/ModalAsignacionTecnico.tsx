@@ -1,4 +1,4 @@
-import { X, UserCheck, UserX, Moon, AlertCircle, UserMinus, Plus, Trash2 } from "lucide-react";
+import { X, UserCheck, UserX, Moon, AlertCircle, UserMinus, Plus, Trash2, Wand2 } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -7,8 +7,7 @@ interface Props {
   fecha: string;
   empleados: any[]; 
   mapaHorarios: Map<string, string[]>;
-  onAsignar: (ordenId: string, indiceTecnico: number, nuevoNombre: string) => void;
-  // NUEVA PROP: Para agregar/eliminar slots enteros
+  onAsignar: (ordenId: string, indiceTecnico: number, nuevoNombre: string, esAutomatico?: boolean) => void;
   onModificarCupos: (ordenId: string, accion: 'ADD' | 'REMOVE', rol?: string, indice?: number) => void;
 }
 
@@ -32,10 +31,49 @@ export const ModalAsignacionTecnico = ({
   const fechaObj = new Date(y, m - 1, d);
   const esSabado = fechaObj.getDay() === 6;
 
-  // Obtenemos la lista de técnicos YA asignados en esta OT para evitar duplicados
+  // Lista de técnicos ya usados en esta OT para evitar duplicados en la sugerencia o selección
   const tecnicosYaAsignados = orden.tecnicos
     .map((t: any) => t.nombre)
     .filter((n: string) => n !== 'VACANTE');
+
+  // --- FUNCIÓN SUGERIR AUTOMÁTICO ---
+  const sugerirTecnicosFaltantes = () => {
+      orden.tecnicos.forEach((slot: any, idx: number) => {
+          // Solo intentamos llenar los que están vacíos
+          if (slot.nombre === 'VACANTE') {
+              const rolRequerido = slot.rol;
+              
+              // 1. Filtramos candidatos por rol y planta
+              const candidatos = empleados.filter((emp: any) => {
+                  const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
+                  const mismaPlanta = emp.planta === orden.planta || orden.planta === 'OTROS';
+                  return mismoRol && mismaPlanta;
+              });
+
+              // 2. Buscamos el primero que esté disponible y no repetido
+              const mejorCandidato = candidatos.find((cand: any) => {
+                  const nombre = cand.key || cand.nombre;
+                  if (tecnicosYaAsignados.includes(nombre)) return false; 
+
+                  const turnos = mapaHorarios.get(nombre);
+                  const turnoDia = turnos ? turnos[diaIndex] : "?";
+                  const turnoLimpio = String(turnoDia).trim().toUpperCase();
+
+                  if (esSabado) {
+                      return !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b));
+                  } else {
+                      return turnoLimpio === 'N';
+                  }
+              });
+
+              if (mejorCandidato) {
+                  const nombreFinal = mejorCandidato.key || mejorCandidato.nombre;
+                  onAsignar(orden.nroOrden, idx, nombreFinal, true);
+                  tecnicosYaAsignados.push(nombreFinal); // Lo marcamos como usado para la siguiente iteración del loop
+              }
+          }
+      });
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
@@ -57,8 +95,8 @@ export const ModalAsignacionTecnico = ({
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X/></button>
           </div>
 
-          {/* CONTROLES PARA AGREGAR CUPOS */}
-          <div className="flex gap-2 pt-2 border-t border-slate-800">
+          {/* CONTROLES */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
              <button 
                onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'M')}
                className="flex items-center gap-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors"
@@ -71,6 +109,14 @@ export const ModalAsignacionTecnico = ({
              >
                 <Plus size={12} /> Agregar Eléctrico
              </button>
+             
+             {/* BOTÓN SUGERIR */}
+             <button 
+               onClick={sugerirTecnicosFaltantes}
+               className="ml-auto flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-purple-900/20"
+             >
+                <Wand2 size={12} /> Sugerir Disponibles
+             </button>
           </div>
         </div>
 
@@ -80,14 +126,12 @@ export const ModalAsignacionTecnico = ({
             const rolRequerido = slot.rol;
             const etiquetaRol = String(rolRequerido).startsWith('E') ? 'Eléctrico' : 'Mecánico';
             
-            // 1. Filtramos candidatos
             const candidatos = empleados.filter((emp: any) => {
                 const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
                 const mismaPlanta = emp.planta === orden.planta || orden.planta === 'OTROS';
                 return mismoRol && mismaPlanta;
             });
 
-            // 2. Mapeamos disponibilidad
             const candidatosConTurno = candidatos.map(cand => {
                 const nombre = cand.key || cand.nombre || "NN";
                 const turnos = mapaHorarios.get(nombre);
@@ -102,33 +146,27 @@ export const ModalAsignacionTecnico = ({
                     estaDisponible = turnoLimpio === 'N';
                 }
                 
-                // VALIDACIÓN: ¿Ya está asignado en OTRO slot de esta misma orden?
-                // (Ignoramos si es el slot actual, aunque el nombre coincida)
+                // Ya en uso en OTRO slot (no en este mismo si lo estamos reasignando)
                 const yaEnUso = tecnicosYaAsignados.includes(nombre) && slot.nombre !== nombre;
 
                 return { nombre, estaDisponible, turnoDia, yaEnUso };
             });
 
-            // 3. Ordenamos
             candidatosConTurno.sort((a, b) => {
-                // Prioridad 1: No estar en uso
                 if (a.yaEnUso !== b.yaEnUso) return a.yaEnUso ? 1 : -1;
-                // Prioridad 2: Estar disponible (turno)
                 if (a.estaDisponible !== b.estaDisponible) return b.estaDisponible ? 1 : -1;
-                // Prioridad 3: Alfabético
                 return a.nombre.localeCompare(b.nombre);
             });
 
             return (
               <div key={idx} className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm relative group/card">
                 
-                {/* Cabecera del Slot */}
                 <div className="flex justify-between mb-3 items-center border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                         Puesto {idx + 1}: <span className={etiquetaRol === 'Eléctrico' ? 'text-yellow-600' : 'text-blue-600'}>{etiquetaRol}</span>
                       </span>
-                      {/* Botón para ELIMINAR este cupo completo */}
+                      {/* Eliminar Cupo Completo */}
                       <button 
                         onClick={() => onModificarCupos(orden.nroOrden, 'REMOVE', undefined, idx)}
                         className="opacity-0 group-hover/card:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
@@ -142,12 +180,12 @@ export const ModalAsignacionTecnico = ({
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${slot.nombre === 'VACANTE' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-700'}`}>
                         Actual: {slot.nombre}
                       </span>
-                      {/* Botón para vaciar slot (sin eliminarlo) */}
+                      {/* Quitar Técnico (Dejar Vacante) */}
                       {slot.nombre !== 'VACANTE' && (
                           <button 
                             onClick={() => onAsignar(orden.nroOrden, idx, "VACANTE")}
                             className="p-1 bg-red-50 text-red-500 rounded hover:bg-red-100 hover:text-red-700 transition-colors"
-                            title="Quitar técnico (Dejar vacante)"
+                            title="Quitar técnico"
                           >
                             <UserMinus size={14}/>
                           </button>
@@ -163,14 +201,17 @@ export const ModalAsignacionTecnico = ({
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                     {candidatosConTurno.map((cand) => {
                         const esSeleccionado = cand.nombre === slot.nombre;
-                        // Deshabilitar si no tiene turno O si ya está asignado en otro puesto
                         const isDisabled = !cand.estaDisponible || cand.yaEnUso;
 
                         return (
                             <button
                             key={cand.nombre}
-                            disabled={isDisabled && !esSeleccionado} // Permitir click si es el seleccionado (para re-validar visualmente)
-                            onClick={() => !isDisabled && onAsignar(orden.nroOrden, idx, cand.nombre)}
+                            disabled={isDisabled && !esSeleccionado}
+                            onClick={() => {
+                                if (!isDisabled) {
+                                    onAsignar(orden.nroOrden, idx, cand.nombre, false); 
+                                }
+                            }}
                             className={`
                                 flex items-center gap-2 p-2 rounded-xl text-left transition-all border group relative
                                 ${esSeleccionado 

@@ -1,5 +1,5 @@
 import { useMemo } from "react"; 
-import { X, Move, User, Info, Calendar } from "lucide-react";
+import { X, Move, User, Info, Calendar, Sparkles } from "lucide-react";
 
 // --- Helpers ---
 const getWeekNumber = (d: Date) => {
@@ -21,7 +21,9 @@ interface PanelLateralProps {
   handleDragStart: (e: React.DragEvent, ot: any) => void;
   handleDragEnd: () => void;
   plantaSeleccionada: string;
-  onEditTecnicos: (orden: any) => void; // <--- 1. AGREGAR A LA INTERFAZ
+  onEditTecnicos: (orden: any) => void;
+  // NUEVA PROP
+  mostrarSoloVacantes: boolean;
 }
 
 export const PanelLateral = ({
@@ -32,26 +34,38 @@ export const PanelLateral = ({
   handleDragStart,
   handleDragEnd,
   plantaSeleccionada,
-  onEditTecnicos // <--- 2. RECIBIR AQUÍ
+  onEditTecnicos,
+  mostrarSoloVacantes // Recibimos el filtro
 }: PanelLateralProps) => {
 
   const ordenesVisualizadas = useMemo(() => {
     if (!diaSeleccionado) return [];
+    
+    let listaFiltrada: any[] = [];
+
     if (diaSeleccionado.startsWith("WEEK-")) {
       const semanaNum = parseInt(diaSeleccionado.split("-")[1]);
-      const todasLasOrdenes: any[] = [];
       Object.keys(ordenesPorDia).forEach((fecha) => {
         const [d, m, y] = fecha.split("/").map(Number);
         const fechaObj = new Date(y, m - 1, d);
         const semanaDeLaOrden = getWeekNumber(fechaObj);
         if (semanaDeLaOrden === semanaNum) {
-          todasLasOrdenes.push(...ordenesPorDia[fecha]);
+          listaFiltrada.push(...ordenesPorDia[fecha]);
         }
       });
-      return todasLasOrdenes;
+    } else {
+      listaFiltrada = ordenesPorDia[diaSeleccionado] || [];
     }
-    return ordenesPorDia[diaSeleccionado] || [];
-  }, [diaSeleccionado, ordenesPorDia]);
+
+    // APLICAR FILTRO DE VACANTES SI ESTÁ ACTIVO
+    if (mostrarSoloVacantes) {
+        return listaFiltrada.filter(ot => 
+            ot.tecnicos.some((t: any) => t.nombre === 'VACANTE')
+        );
+    }
+
+    return listaFiltrada;
+  }, [diaSeleccionado, ordenesPorDia, mostrarSoloVacantes]);
 
   const tituloPanel = useMemo(() => {
     if (!diaSeleccionado) return "Pendientes";
@@ -68,7 +82,9 @@ export const PanelLateral = ({
               {tituloPanel}
             </h4>
             <p className="text-[10px] font-bold text-slate-200 uppercase mt-1">
-              {diaSeleccionado ? `${ordenesVisualizadas.length} Órdenes Asignadas` : "Sin turno de noche"}
+              {diaSeleccionado 
+                ? `${ordenesVisualizadas.length} Órdenes ${mostrarSoloVacantes ? 'Incompletas' : 'Asignadas'}` 
+                : "Sin turno de noche"}
             </p>
           </div>
           {diaSeleccionado && (
@@ -86,13 +102,17 @@ export const PanelLateral = ({
                   handleDragStart={handleDragStart} 
                   handleDragEnd={handleDragEnd} 
                   esAsignada={true}
-                  onEditTecnicos={onEditTecnicos} // <--- 3. PASAR A LA TARJETA
+                  onEditTecnicos={onEditTecnicos}
                 />
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400 opacity-60">
                  <Calendar size={40} className="mb-2 stroke-1" />
-                 <span className="text-xs font-bold uppercase tracking-wider">Sin órdenes esta semana</span>
+                 <span className="text-xs font-bold uppercase tracking-wider text-center">
+                    {mostrarSoloVacantes 
+                        ? "Todas las órdenes completas" 
+                        : "Sin órdenes esta semana"}
+                 </span>
               </div>
             )
           ) : (
@@ -111,7 +131,7 @@ export const PanelLateral = ({
                 handleDragStart={handleDragStart} 
                 handleDragEnd={handleDragEnd} 
                 esAsignada={false}
-                onEditTecnicos={onEditTecnicos} // <--- 3. PASAR A LA TARJETA (Opcional si quieres editar pendientes)
+                onEditTecnicos={onEditTecnicos}
               />
             ))
           )}
@@ -165,21 +185,25 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEdi
         <div className="flex flex-col gap-1">
           {listaTecnicos.map((tec: any, idx: number) => (
             <div key={idx} className="flex items-center justify-between"> 
-                <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase">
+                <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase w-full">
                     <User size={10} className={tec.rol === 'E' ? "text-yellow-500" : "text-blue-500"} /> 
-                    <span className={tec.nombre === "VACANTE" ? "text-amber-500 font-black" : ""}>
-                    {tec.nombre}
+                    
+                    <span className={`truncate flex-1 ${tec.nombre === "VACANTE" ? "text-amber-500 font-black" : ""}`}>
+                       {tec.nombre}
                     </span>
+
+                    {/* ÍCONO DE SUGERIDO POR ALGORITMO */}
+                    {tec.esSugerido && (
+                        <Sparkles size={10} className="text-purple-500 ml-1 fill-purple-100" title="Sugerido automáticamente" />
+                    )}
                 </div>
             </div>
           ))}
           
-          {/* BOTÓN "CAMBIAR TÉCNICOS" */}
           {esAsignada && (
               <button 
                 onClick={(e) => {
                     e.stopPropagation();
-                    // --- 4. AQUI SE EJECUTA LA FUNCIÓN ---
                     if (onEditTecnicos) onEditTecnicos(orden);
                 }}
                 className="mt-2 w-full text-[9px] font-bold text-slate-400 bg-slate-50 hover:bg-slate-100 hover:text-pf-red py-1 rounded border border-slate-200 transition-colors"
@@ -189,15 +213,10 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEdi
           )}
         </div>
         
-        {orden.fechaAnterior && orden.fechaAnterior !== "N/A" ? (
+        {orden.fechaAnterior && orden.fechaAnterior !== "N/A" && (
           <div className="flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg w-fit mt-1">
             <Calendar size={10} />
             <span>Última vez: {orden.fechaAnterior}</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg w-fit mt-1">
-            <Calendar size={10} />
-            <span>Sin fecha anterior - {orden.fechaSugerida || "N/A"}</span>
           </div>
         )}
       </div>

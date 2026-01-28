@@ -155,26 +155,30 @@ function App() {
   };
 
   // --- MANEJO DE ASIGNACIÓN DE TÉCNICO (MODAL) ---
-  const handleAsignarTecnico = (nroOrden: string, indexTecnico: number, nuevoNombre: string) => {
-    setPlanResult(prev => prev.map(ot => {
-        if (ot.nroOrden === nroOrden) {
-            const nuevosTecnicos = [...ot.tecnicos];
-            nuevosTecnicos[indexTecnico] = {
-                ...nuevosTecnicos[indexTecnico],
-                nombre: nuevoNombre
-            };
-            return { ...ot, tecnicos: nuevosTecnicos };
-        }
-        return ot;
-    }));
+  const handleAsignarTecnico = (nroOrden: string, indexTecnico: number, nuevoNombre: string, esAutomatico: boolean = false) => {
+    
+      // Función auxiliar para actualizar
+      const actualizarOrden = (ot: any) => {
+          const nuevosTecnicos = [...ot.tecnicos];
+          nuevosTecnicos[indexTecnico] = {
+              ...nuevosTecnicos[indexTecnico],
+              nombre: nuevoNombre,
+              esSugerido: esAutomatico
+          };
+          return { ...ot, tecnicos: nuevosTecnicos };
+      };
 
-    // Actualizamos también la orden en edición para reflejar cambios en el modal inmediatamente
-    setOrdenEditando((prev: any) => {
-        if (!prev) return null;
-        const nuevos = [...prev.tecnicos];
-        nuevos[indexTecnico] = { ...nuevos[indexTecnico], nombre: nuevoNombre };
-        return { ...prev, tecnicos: nuevos };
-    });
+      setPlanResult(prev => prev.map(ot => 
+          ot.nroOrden === nroOrden ? actualizarOrden(ot) : ot
+      ));
+
+      // Actualizar también el estado local del modal para verlo reflejado al instante
+      setOrdenEditando((prev: any) => {
+          if (prev && prev.nroOrden === nroOrden) {
+              return actualizarOrden(prev);
+          }
+          return prev;
+      });
   };
 
 

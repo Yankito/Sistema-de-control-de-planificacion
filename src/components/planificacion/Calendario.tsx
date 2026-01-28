@@ -1,6 +1,5 @@
-// src/components/planificacion/Calendario.tsx
 import { useMemo } from "react";
-import { Moon, CheckCircle2} from "lucide-react";
+import { Moon, CheckCircle2, UserX, Users } from "lucide-react";
 
 interface CalendarioProps {
   planResult: any[];
@@ -17,27 +16,20 @@ interface CalendarioProps {
   showSuccess: boolean;
   dragOverDate: string | null;
   ordenesPorDia: any;
+  // NUEVAS PROPS
+  mostrarSoloVacantes: boolean;
+  setMostrarSoloVacantes: (v: boolean) => void;
+  mensajeExito?: string;
 }
 
 const getWeekNumber = (d: Date) => {
-  // Definimos explícitamente el inicio de la Semana 1: Lunes 5 de Enero de 2026
-  const inicioSemana1 = new Date(2026, 0, 5); // Mes 0 es Enero
-  
-  // Normalizamos las horas para evitar errores por zona horaria
+  const inicioSemana1 = new Date(2026, 0, 5); 
   const fechaActual = new Date(d);
   fechaActual.setHours(0, 0, 0, 0);
   inicioSemana1.setHours(0, 0, 0, 0);
-
-  // Calculamos la diferencia en milisegundos
   const diffTime = fechaActual.getTime() - inicioSemana1.getTime();
-  
-  // Convertimos a días
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  // Si la diferencia es negativa (antes del 5 de enero), manejamos casos especiales
-  // o devolvemos 0/sem anterior. Para este caso, asumimos fechas >= 5 Enero o cercanas.
-  
-  // Calculamos la semana: (días transcurridos / 7) + 1
+  if (diffDays < 0) return 0;
   return Math.floor(diffDays / 7) + 1;
 };
 
@@ -55,8 +47,13 @@ export const Calendario = ({
   isNocheValid,
   showSuccess,
   dragOverDate,
-  ordenesPorDia
+  ordenesPorDia,
+  mostrarSoloVacantes,    // Recibimos prop
+  setMostrarSoloVacantes,  // Recibimos prop
+  mensajeExito = "Planificación Actualizada"
 }: CalendarioProps) => {
+
+  // Eliminamos el useState local: const [mostrarSoloVacantes, setMostrarSoloVacantes] = useState(false);
 
   const { semanas, nombreMes, totalOrdenesMes, anioActual } = useMemo(() => {
     const base = planResult[0]?.fechaSugerida || "01/02/2026"; 
@@ -65,7 +62,6 @@ export const Calendario = ({
     const ultimoDia = new Date(anio, mes, 0).getDate();
     const nombreMes = primerDia.toLocaleString('es-ES', { month: 'long' });
     
-    // Calcular padding para que el calendario empiece en Lunes
     let startIdx = primerDia.getDay() - 1;
     if (startIdx === -1) startIdx = 6;
 
@@ -81,33 +77,20 @@ export const Calendario = ({
     const semanasArr = [];
     let totalMes = 0;
 
-    // Iteramos de 7 en 7 para armar las filas
     for (let i = 0; i < diasArray.length; i += 7) {
       const chunk = diasArray.slice(i, i + 7);
-      
-      // Buscamos una fecha válida en esta fila para calcular a qué semana pertenece
       const fechaRefStr = chunk.find(d => d !== null);
       let numSemana = 0;
-      let totalSemana = 0;
-
       if (fechaRefStr) {
         const [d, m, y] = fechaRefStr.split('/').map(Number);
-        // Calculamos la semana basándonos en esa fecha
         numSemana = getWeekNumber(new Date(y, m - 1, d));
-      } else {
-        // Caso borde: Si la fila tiene puros nulls (raro), intentamos calcular basado en el índice
-        // Pero con la lógica actual siempre habrá al menos una fecha si es el inicio/fin de mes
       }
-
       chunk.forEach(fecha => {
-        if (fecha && ordenesPorDia[fecha]) totalSemana += ordenesPorDia[fecha].length;
+        if (fecha && ordenesPorDia[fecha]) totalMes += ordenesPorDia[fecha].length;
       });
-      totalMes += totalSemana;
-
       semanasArr.push({
         numero: numSemana,
         dias: chunk,
-        totalOrdenes: totalSemana,
         idSemana: `WEEK-${numSemana}`
       });
     }
@@ -121,12 +104,13 @@ export const Calendario = ({
   }, [planResult, ordenesPorDia]);
 
   return (
+    
     <div className="flex-1 space-y-6 relative">
-      {/* Notificación */}
+      {/* Notificación Dinámica */}
       {showSuccess && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[100] bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
           <CheckCircle2 size={20} />
-          <span className="font-black uppercase text-xs tracking-widest">Planificación Actualizada</span>
+          <span className="font-black uppercase text-xs tracking-widest">{mensajeExito}</span>
         </div>
       )}
 
@@ -134,6 +118,21 @@ export const Calendario = ({
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-pf-border shadow-sm">
         <div className="flex items-center space-x-6">
           <h3 className="text-xl font-black text-slate-900 uppercase italic">Planificación</h3>
+          
+          {/* BOTÓN FILTRO */}
+          <button 
+            onClick={() => setMostrarSoloVacantes(!mostrarSoloVacantes)}
+            className={`
+               flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm w-56
+               ${mostrarSoloVacantes 
+                 ? 'bg-amber-100 text-amber-700 border-amber-300 ring-2 ring-amber-200' 
+                 : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'}
+            `}
+          >
+             {mostrarSoloVacantes ? <UserX size={14}/> : <Users size={14}/>}
+             <span>{mostrarSoloVacantes ? 'Mostrando OTs Incompletas' : 'Filtrar Sin Técnico'}</span>
+          </button>
+
           <div className="flex items-center gap-3 px-4 border-l border-slate-100">
              <div className="text-right hidden xl:block">
                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest block">{nombreMes} {anioActual}</span>
@@ -161,8 +160,6 @@ export const Calendario = ({
 
             return (
               <div key={idx} className="relative group/semana">
-                
-                {/* INDICADOR SX */}
                 <div className="absolute -left-2 top-1/2 -translate-y-1/2 -translate-x-full pr-2">
                   <button 
                     onClick={() => setDiaSeleccionado(isWeekActive ? null : sem.idSemana)}
@@ -175,12 +172,22 @@ export const Calendario = ({
                   </button>
                 </div>
 
-                {/* Grid de días */}
                 <div className={`grid grid-cols-7 gap-3 p-2 rounded-3xl transition-colors duration-300 ${isWeekActive ? 'bg-pf-red/[0.03]' : ''}`}>
                   {sem.dias.map((fecha, i) => {
                     if (!fecha) return <div key={`e-${idx}-${i}`} className="aspect-square" />;
 
-                    const cantidad = ordenesPorDia[fecha]?.length || 0;
+                    const ordenesDelDia = ordenesPorDia[fecha] || [];
+                    const totalCount = ordenesDelDia.length;
+                    
+                    const vacantesCount = ordenesDelDia.filter((ot: any) => 
+                        ot.tecnicos.some((t: any) => t.nombre === 'VACANTE')
+                    ).length;
+
+                    const countDisplay = mostrarSoloVacantes ? vacantesCount : totalCount;
+                    const isActive = countDisplay > 0;
+                    const estaFiltrado = mostrarSoloVacantes && !isActive && totalCount > 0;
+                    const hasAnyVacancy = vacantesCount > 0;
+
                     const diaNum = parseInt(fecha.split('/')[0]);
                     const esNocheOk = draggingOT && isNocheValid(draggingOT.tecnicos, fecha);
                     const isHovered = dragOverDate === fecha;
@@ -199,14 +206,26 @@ export const Calendario = ({
                           ${isHovered ? 'bg-slate-100 ring-4 ring-pf-red/20 scale-110 z-20' : ''} 
                           ${esNocheOk && !isHovered ? 'bg-pf-red/5 border-pf-red/30' : ''}
                           ${draggingOT && !esNocheOk && !isHovered ? 'opacity-30 blur-[1px]' : 'opacity-100'}
+                          
+                          ${estaFiltrado ? 'opacity-20 grayscale border-transparent' : ''}
+                          ${hasAnyVacancy && !isDaySelected && !mostrarSoloVacantes ? 'border-amber-200' : ''}
+
                           hover:border-slate-200
                         `}
                       >
                         {esNocheOk && <Moon size={14} className="absolute top-3 right-3 text-pf-red fill-pf-red animate-pulse" />}
-                        <span className={`text-2xl font-black ${cantidad > 0 ? 'text-slate-800' : 'text-slate-200'}`}>{diaNum}</span>
-                        {cantidad > 0 && (
-                          <div className="mt-1 px-2 py-0.5 bg-pf-red text-white rounded-full font-black text-[9px] uppercase">
-                            {cantidad} OTS
+                        
+                        {hasAnyVacancy && !mostrarSoloVacantes && (
+                            <div className="absolute top-3 right-3 w-2 h-2 bg-amber-500 rounded-full animate-pulse shadow-sm" title="Tiene vacantes"/>
+                        )}
+
+                        <span className={`text-2xl font-black ${isActive ? 'text-slate-800' : 'text-slate-200'}`}>{diaNum}</span>
+                        
+                        {isActive && (
+                          <div className={`mt-1 px-2 py-0.5 text-white rounded-full font-black text-[9px] uppercase shadow-sm transition-all
+                             ${mostrarSoloVacantes ? 'bg-amber-500 scale-110' : (hasAnyVacancy ? 'bg-slate-800' : 'bg-pf-red')}
+                          `}>
+                            {countDisplay} {mostrarSoloVacantes ? 'INC' : 'OTS'}
                           </div>
                         )}
                       </div>
