@@ -28,6 +28,9 @@ import {
   necesitaValidacionTurno, 
   PLANTAS_CI 
 } from "./utils/planificacionUtils";
+import { processFallasData } from "./logic/fallasProcessor";
+import { FallasView } from "./views/FallasView";
+import { FallaRow } from "./types"; // Asegúrate de importar esto
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
@@ -56,12 +59,16 @@ function App() {
   const [modalTecnicoOpen, setModalTecnicoOpen] = useState(false);
   const [ordenEditando, setOrdenEditando] = useState<any>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => {
+  const [fallasResult, setFallasResult] = useState<FallaRow[]>([]);
+  const [cargandoFallas, setCargandoFallas] = useState(false);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' | 'FALLAS') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (tipo === 'PLAN') setCargandoPlan(true);
     else if (tipo === 'SEGUIMIENTO') setCargandoSeguimiento(true);
+    else if (tipo === 'FALLAS') setCargandoFallas(true);
     else setCargandoAtrasos(true);
 
     const reader = new FileReader();
@@ -90,6 +97,10 @@ function App() {
             const resultados = processSeguimiento(workbook.Sheets);
             setSeguimientoResult(resultados);
             if (resultados.mantencion.length > 0 || resultados.infraestructura.length > 0) setActiveTab("seguimiento");
+          } else if (tipo === 'FALLAS') {
+            const datosFallas = processFallasData(workbook.Sheets);
+            setFallasResult(datosFallas);
+            if (datosFallas.length > 0) setActiveTab("fallas");
           }
         } catch (e) {
           console.error("Error:", e);
@@ -98,6 +109,7 @@ function App() {
           setCargandoPlan(false);
           setCargandoAtrasos(false);
           setCargandoSeguimiento(false);
+          setCargandoFallas(false);
         }
       }, 100);
     };
@@ -113,6 +125,7 @@ function App() {
     setArchivoCargado(false);
     setActiveTab("dash");
     setSeguimientoResult({ mantencion: [], infraestructura: [] });
+    setFallasResult([]);
   };
 
   const cambiarPlantaHorarios = (nueva: string) => {
@@ -260,6 +273,7 @@ function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onLimpiar={limpiarDatos} 
+        tieneFallas={fallasResult.length > 0}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <section className="flex-1 p-10 overflow-y-auto">
@@ -269,12 +283,13 @@ function App() {
                 <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter">Gestión de Datos</h2>
                 <FileUploader 
                   onFileUpload={handleFileUpload} 
-                  isLoading={cargandoPlan || cargandoAtrasos}
+                  isLoading={cargandoPlan || cargandoAtrasos || cargandoSeguimiento || cargandoFallas}
                   status={{ 
                     plan: archivoCargado, 
                     atrasos: atrasosResult.length > 0,
                     anterior: atrasosAnterior.length > 0 ,
-                    seguimiento: seguimientoResult.mantencion.length > 0
+                    seguimiento: seguimientoResult.mantencion.length > 0,
+                    fallas: fallasResult.length > 0
                   }}
                 />
               </div>
@@ -340,6 +355,9 @@ function App() {
                   plantas={plantas}
                   onNavegar={handleNavegarDesdeCarga}
               />
+          )}
+          {activeTab === "fallas" && fallasResult.length > 0 && (
+             <FallasView data={fallasResult} />
           )}
         </section>
       </main>

@@ -7,7 +7,8 @@ import {
   RotateCcw,
   Clock,
   Lock,
-  ClipboardList
+  ClipboardList,
+  BarChart2
 } from "lucide-react";
 
 export const Sidebar = ({ 
@@ -16,10 +17,11 @@ export const Sidebar = ({
   tieneSeguimiento, 
   activeTab, 
   setActiveTab, 
-  onLimpiar 
+  onLimpiar,
+  tieneFallas
 }: any) => {
 
-  const hayDatos = archivoCargado || tieneAtrasos || tieneSeguimiento;
+  const hayDatos = archivoCargado || tieneAtrasos || tieneSeguimiento || tieneFallas;
 
   const menuItems = [
     { id: 'dash', label: 'Dashboard', icon: LayoutDashboard, locked: false },
@@ -29,6 +31,7 @@ export const Sidebar = ({
     { id: 'carga', label: 'Seguimiento Técnicos', icon: ClipboardList, locked: !archivoCargado },
     { id: 'atrasos', label: 'Atrasos/KPI', icon: Clock, locked: !tieneAtrasos },
     { id: 'seguimiento', label: 'Seguimiento OT', icon: ClipboardList, locked: !tieneSeguimiento },
+    { id: 'fallas', label: 'Fallas Activos', icon: BarChart2, locked: !tieneFallas },
   ];
 
   return (

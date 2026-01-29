@@ -1,16 +1,39 @@
 // src/components/FileUploader.tsx
-import { FileSpreadsheet, UploadCloud, Clock, History, FileCheck2 } from "lucide-react";
+import { 
+  FileSpreadsheet, 
+  UploadCloud, 
+  Clock, 
+  History, 
+  FileCheck2, 
+  AlertTriangle // Importamos icono para Fallas
+} from "lucide-react";
 import { useState } from "react";
 
 interface FileUploaderProps {
-  onFileUpload: (e: any, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO') => void;
+  // Agregamos 'FALLAS' al tipo
+  onFileUpload: (e: any, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' | 'FALLAS') => void;
   isLoading: boolean;
-  // Actualizamos status para incluir el reporte anterior
-  status: { plan: boolean; atrasos: boolean; anterior: boolean; seguimiento: boolean };
+  status: { 
+    plan: boolean; 
+    atrasos: boolean; 
+    anterior: boolean; 
+    seguimiento: boolean;
+    fallas: boolean; // Agregamos estado fallas
+  };
 }
 
 export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -22,30 +45,39 @@ export const FileUploader = ({ onFileUpload, isLoading, status }: FileUploaderPr
     const name = file.name.toLowerCase();
     
     // Lógica inteligente de detección por nombre
-    let tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' = 'PLAN';
+    let tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' | 'FALLAS' = 'PLAN';
+    
     if (name.includes("resumen") || name.includes("historico")) {
       tipo = 'ANTERIOR';
     } else if (name.includes("atraso") || name.includes("cumplimiento") || name.includes("kpi")) {
       tipo = 'ATRASOS';
-    } else if (name.includes("s") || name.includes("stgo")) {
+    } else if (name.includes("s") && (name.includes("stgo") || name.includes("seguimiento"))) {
+      // Ajusté un poco la lógica de seguimiento para ser más específica
       tipo = 'SEGUIMIENTO';
+    } else if (name.includes("mtbf") || name.includes("mttr") || name.includes("falla")) {
+      // Nueva detección para fallas
+      tipo = 'FALLAS';
     }
+    
     console.log("Detectado tipo de archivo:", tipo);
 
     const fakeEvent = { target: { files: [file] } } as any;
     onFileUpload(fakeEvent, tipo);
   };
 
-return (
+  return (
     <div className="max-w-5xl mx-auto mt-2">
       <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={`
           relative border-2 border-dashed rounded-[2rem] p-10 transition-all duration-300
           ${isDragging ? "border-pf-red bg-pf-red/5 scale-[1.01]" : "border-slate-200 bg-white"}
           ${isLoading ? "cursor-wait" : "cursor-default"}
         `}
       >
-        {/* OVERLAY DE CARGA - Evita que se vea congelado */}
+        {/* OVERLAY DE CARGA */}
         {isLoading && (
           <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm rounded-[2rem] flex flex-col items-center justify-center animate-in fade-in duration-300">
             <div className="w-20 h-20 relative">
@@ -60,7 +92,7 @@ return (
         )}
 
         <div className={`flex flex-col items-center ${isLoading ? 'blur-sm' : ''}`}>
-          {/* Contenido original del Uploader... */}
+          
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-slate-50 text-pf-red`}>
             <UploadCloud size={32} />
           </div>
@@ -72,7 +104,8 @@ return (
             Arrastra los archivos o selecciona manualmente
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+          {/* GRID: Ajustado para acomodar 5 botones de forma estética */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full">
             
             {/* 1. Maestro Plan */}
             <label className={`flex items-center p-4 rounded-2xl font-bold text-white transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-95 ${status.plan ? 'bg-green-600' : 'bg-pf-red'}`}>
@@ -108,7 +141,7 @@ return (
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'ANTERIOR')} disabled={isLoading} />
             </label>
 
-            {/* 4. Nuevo Botón SEGUIMIENTO */}
+            {/* 4. Seguimiento OT */}
             <label className={`flex items-center p-4 rounded-2xl font-bold transition-all cursor-pointer shadow-md border-2 hover:scale-[1.02] active:scale-95 ${
               status.seguimiento 
                 ? 'bg-purple-600 border-purple-600 text-white' 
@@ -120,6 +153,20 @@ return (
                 <span className="text-[9px] opacity-80 uppercase">{status.seguimiento ? '✓ Procesado' : 'Subir Excel'}</span>
               </div>
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'SEGUIMIENTO')} disabled={isLoading} />
+            </label>
+
+            {/* 5. NUEVO: Fallas / MTBF (Color Ámbar) */}
+            <label className={`flex items-center p-4 rounded-2xl font-bold transition-all cursor-pointer shadow-md border-2 hover:scale-[1.02] active:scale-95 ${
+              status.fallas 
+                ? 'bg-amber-500 border-amber-500 text-white' 
+                : 'bg-white border-slate-200 text-amber-500 hover:border-amber-400'
+            }`}>
+              <AlertTriangle size={20} className={`mr-3 flex-shrink-0 ${status.fallas ? 'text-white' : 'text-amber-500'}`} />
+              <div className="flex flex-col leading-tight">
+                <span className="text-xs">Fallas / MTBF</span>
+                <span className="text-[9px] opacity-80 uppercase">{status.fallas ? '✓ Cargado' : 'Subir Detalle'}</span>
+              </div>
+              <input type="file" className="hidden" accept=".xlsx, .xls" onChange={(e) => onFileUpload(e, 'FALLAS')} disabled={isLoading} />
             </label>
 
           </div>

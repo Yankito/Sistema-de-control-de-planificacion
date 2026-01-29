@@ -34,3 +34,22 @@ export interface SeguimientoResult {
   mantencion: SeguimientoRow[];
   infraestructura: SeguimientoRow[];
 }
+
+export interface FallaRow {
+  fecha: Date;
+  semana: number;
+  planta: string;
+  area: string;
+  linea: string;
+  equipo: string;
+  causa: string;
+  estadoPedido: string;
+  tipoPedido: string;
+  tecnico: string;
+  duracionMinutos: number; // Duración Paro Oracle [min]
+  gasto: number; // Gasto OM [$]
+  perdidaKg: number; // Pérdida por Paro [kg]
+  anio: number;
+  mes: number;
+  descripcionOperador: string;
+}
