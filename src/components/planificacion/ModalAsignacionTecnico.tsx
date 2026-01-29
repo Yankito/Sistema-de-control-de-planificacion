@@ -1,5 +1,9 @@
-import { X, UserCheck, UserX, Moon, AlertCircle, UserMinus, Plus, Trash2, Wand2 } from "lucide-react";
-
+import { X, UserCheck, UserX, Moon, AlertCircle, UserMinus, Plus, Trash2, Wand2, ShieldCheck } from "lucide-react";
+import { 
+  esPlantaCompatible, 
+  rolesCoinciden, 
+  necesitaValidacionTurno 
+} from "../../utils/planificacionUtils";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -11,12 +15,6 @@ interface Props {
   onModificarCupos: (ordenId: string, accion: 'ADD' | 'REMOVE', rol?: string, indice?: number) => void;
 }
 
-const rolesCoinciden = (rolA: string, rolB: string) => {
-    const r1 = String(rolA || "").trim().toUpperCase().charAt(0);
-    const r2 = String(rolB || "").trim().toUpperCase().charAt(0);
-    return r1 === r2;
-};
-
 const BLOQUEOS_SABADO = ['L', 'V', 'LIC', 'LM', 'LP'];
 
 export const ModalAsignacionTecnico = ({ 
@@ -27,11 +25,9 @@ export const ModalAsignacionTecnico = ({
 
   const [d, m, y] = fecha.split('/').map(Number);
   const diaIndex = d - 1; 
-  
   const fechaObj = new Date(y, m - 1, d);
   const esSabado = fechaObj.getDay() === 6;
 
-  // Lista de técnicos ya usados en esta OT para evitar duplicados en la sugerencia o selección
   const tecnicosYaAsignados = orden.tecnicos
     .map((t: any) => t.nombre)
     .filter((n: string) => n !== 'VACANTE');
@@ -39,37 +35,29 @@ export const ModalAsignacionTecnico = ({
   // --- FUNCIÓN SUGERIR AUTOMÁTICO ---
   const sugerirTecnicosFaltantes = () => {
       orden.tecnicos.forEach((slot: any, idx: number) => {
-          // Solo intentamos llenar los que están vacíos
           if (slot.nombre === 'VACANTE') {
-              const rolRequerido = slot.rol;
-              
-              // 1. Filtramos candidatos por rol y planta
               const candidatos = empleados.filter((emp: any) => {
-                  const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
-                  const mismaPlanta = emp.planta === orden.planta || orden.planta === 'OTROS';
-                  return mismoRol && mismaPlanta;
+                  return rolesCoinciden(slot.rol, emp.rol) && esPlantaCompatible(emp.planta, orden.planta);
               });
 
-              // 2. Buscamos el primero que esté disponible y no repetido
               const mejorCandidato = candidatos.find((cand: any) => {
                   const nombre = cand.key || cand.nombre;
                   if (tecnicosYaAsignados.includes(nombre)) return false; 
+
+                  if (!necesitaValidacionTurno(cand.rol)) return true;
 
                   const turnos = mapaHorarios.get(nombre);
                   const turnoDia = turnos ? turnos[diaIndex] : "?";
                   const turnoLimpio = String(turnoDia).trim().toUpperCase();
 
-                  if (esSabado) {
-                      return !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b));
-                  } else {
-                      return turnoLimpio === 'N';
-                  }
+                  if (esSabado) return !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b));
+                  else return turnoLimpio === 'N';
               });
 
               if (mejorCandidato) {
                   const nombreFinal = mejorCandidato.key || mejorCandidato.nombre;
                   onAsignar(orden.nroOrden, idx, nombreFinal, true);
-                  tecnicosYaAsignados.push(nombreFinal); // Lo marcamos como usado para la siguiente iteración del loop
+                  tecnicosYaAsignados.push(nombreFinal);
               }
           }
       });
@@ -95,41 +83,49 @@ export const ModalAsignacionTecnico = ({
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X/></button>
           </div>
 
-          {/* CONTROLES */}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
-             <button 
-               onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'M')}
-               className="flex items-center gap-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-             >
-                <Plus size={12} /> Agregar Mecánico
+             {/* Ahora los botones de agregar cupos pueden ser dinámicos según tus roles principales */}
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'M')} className="flex items-center gap-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Mecánico
              </button>
-             <button 
-               onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'E')}
-               className="flex items-center gap-1 text-[10px] font-bold bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-             >
-                <Plus size={12} /> Agregar Eléctrico
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'E')} className="flex items-center gap-1 text-[10px] font-bold bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Eléctrico
+             </button>
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SADEMA')} className="flex items-center gap-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Sadema
+             </button>
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SUPERVISOR')} className="flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Supervisor
+             </button>
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'CALDERA')} className="flex items-center gap-1 text-[10px] font-bold bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Caldera
+             </button>
+             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SE')} className="flex items-center gap-1 text-[10px] font-bold bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <Plus size={12} /> Servicio Externo
              </button>
              
-             {/* BOTÓN SUGERIR */}
-             <button 
-               onClick={sugerirTecnicosFaltantes}
-               className="ml-auto flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-purple-900/20"
-             >
+             <button onClick={sugerirTecnicosFaltantes} className="ml-auto flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-purple-900/20">
                 <Wand2 size={12} /> Sugerir Disponibles
              </button>
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-6 overflow-y-auto space-y-6 bg-slate-50/50">
           {orden.tecnicos.map((slot: any, idx: number) => {
-            const rolRequerido = slot.rol;
-            const etiquetaRol = String(rolRequerido).startsWith('E') ? 'Eléctrico' : 'Mecánico';
             
+            // --- NUEVA LÓGICA DE ETIQUETA ---
+            const mapeoRoles: Record<string, string> = {
+                'M': 'Mecánico',
+                'E': 'Eléctrico',
+                'SADEMA': 'Sadema',
+                'SUPERVISOR': 'Supervisor',
+                'CALDERA': 'Caldera',
+                'SE': 'Servicio Externo'
+            };
+            const etiquetaRol = mapeoRoles[slot.rol] || slot.rol;
+
             const candidatos = empleados.filter((emp: any) => {
-                const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
-                const mismaPlanta = emp.planta === orden.planta || orden.planta === 'OTROS';
-                return mismoRol && mismaPlanta;
+                return rolesCoinciden(slot.rol, emp.rol) && esPlantaCompatible(emp.planta, orden.planta);
             });
 
             const candidatosConTurno = candidatos.map(cand => {
@@ -138,18 +134,11 @@ export const ModalAsignacionTecnico = ({
                 const turnoDia = turnos ? turnos[diaIndex] : "?";
                 const turnoLimpio = String(turnoDia).trim().toUpperCase();
 
-                let estaDisponible = false;
-                if (esSabado) {
-                    const estaBloqueado = BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b));
-                    estaDisponible = !estaBloqueado;
-                } else {
-                    estaDisponible = turnoLimpio === 'N';
-                }
+                const esExento = !necesitaValidacionTurno(cand.rol);
+                let estaDisponible = esExento ? true : (esSabado ? !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b)) : turnoLimpio === 'N');
                 
-                // Ya en uso en OTRO slot (no en este mismo si lo estamos reasignando)
                 const yaEnUso = tecnicosYaAsignados.includes(nombre) && slot.nombre !== nombre;
-
-                return { nombre, estaDisponible, turnoDia, yaEnUso };
+                return { nombre, estaDisponible, turnoDia, yaEnUso, esExento };
             });
 
             candidatosConTurno.sort((a, b) => {
@@ -160,90 +149,56 @@ export const ModalAsignacionTecnico = ({
 
             return (
               <div key={idx} className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm relative group/card">
-                
                 <div className="flex justify-between mb-3 items-center border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                        Puesto {idx + 1}: <span className={etiquetaRol === 'Eléctrico' ? 'text-yellow-600' : 'text-blue-600'}>{etiquetaRol}</span>
+                        Puesto {idx + 1}: <span className="text-pf-red">{etiquetaRol}</span>
                       </span>
-                      {/* Eliminar Cupo Completo */}
-                      <button 
-                        onClick={() => onModificarCupos(orden.nroOrden, 'REMOVE', undefined, idx)}
-                        className="opacity-0 group-hover/card:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
-                        title="Eliminar este cupo"
-                      >
+                      <button onClick={() => onModificarCupos(orden.nroOrden, 'REMOVE', undefined, idx)} className="opacity-0 group-hover/card:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all">
                         <Trash2 size={12}/>
                       </button>
                   </div>
-                  
                   <div className="flex items-center gap-2">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${slot.nombre === 'VACANTE' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-700'}`}>
                         Actual: {slot.nombre}
                       </span>
-                      {/* Quitar Técnico (Dejar Vacante) */}
                       {slot.nombre !== 'VACANTE' && (
-                          <button 
-                            onClick={() => onAsignar(orden.nroOrden, idx, "VACANTE")}
-                            className="p-1 bg-red-50 text-red-500 rounded hover:bg-red-100 hover:text-red-700 transition-colors"
-                            title="Quitar técnico"
-                          >
+                          <button onClick={() => onAsignar(orden.nroOrden, idx, "VACANTE")} className="p-1 bg-red-50 text-red-500 rounded hover:bg-red-100 hover:text-red-700 transition-colors">
                             <UserMinus size={14}/>
                           </button>
                       )}
                   </div>
                 </div>
 
-                {candidatosConTurno.length === 0 ? (
-                    <div className="flex items-center gap-2 text-slate-400 text-xs p-2 bg-slate-50 rounded-lg">
-                        <AlertCircle size={14}/> No se encontraron técnicos con rol {etiquetaRol} en {orden.planta}.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                    {candidatosConTurno.map((cand) => {
-                        const esSeleccionado = cand.nombre === slot.nombre;
-                        const isDisabled = !cand.estaDisponible || cand.yaEnUso;
-
-                        return (
-                            <button
-                            key={cand.nombre}
-                            disabled={isDisabled && !esSeleccionado}
-                            onClick={() => {
-                                if (!isDisabled) {
-                                    onAsignar(orden.nroOrden, idx, cand.nombre, false); 
-                                }
-                            }}
-                            className={`
-                                flex items-center gap-2 p-2 rounded-xl text-left transition-all border group relative
-                                ${esSeleccionado 
-                                    ? 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-pf-red/50' 
-                                    : 'bg-white border-slate-200'}
-                                ${!isDisabled && !esSeleccionado ? 'hover:border-pf-red hover:shadow-md cursor-pointer' : ''}
-                                ${isDisabled && !esSeleccionado ? 'opacity-40 grayscale cursor-not-allowed bg-slate-50' : ''}
-                            `}
-                            >
-                            <div className={`
-                                w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black
-                                ${cand.estaDisponible ? 'bg-pf-red text-white' : 'bg-slate-100 text-slate-400'}
-                                ${cand.yaEnUso ? '!bg-amber-500 !text-white' : ''} 
-                            `}>
-                                {cand.yaEnUso ? 'X' : (cand.estaDisponible ? (esSabado ? 'S' : 'N') : cand.turnoDia)}
-                            </div>
-                            
-                            <div className="flex flex-col overflow-hidden min-w-0">
-                                <span className="text-[10px] font-bold truncate leading-tight">{cand.nombre}</span>
-                                {cand.yaEnUso ? (
-                                    <span className="text-[8px] text-amber-600 font-bold">Ya asignado</span>
-                                ) : !cand.estaDisponible && (
-                                    <span className="text-[8px] text-red-400 font-medium">
-                                        {esSabado ? "Bloqueado" : "Sin turno N"}
-                                    </span>
-                                )}
-                            </div>
-                            </button>
-                        )
-                    })}
-                    </div>
-                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                  {candidatosConTurno.map((cand) => {
+                    const esSeleccionado = cand.nombre === slot.nombre;
+                    const isDisabled = !cand.estaDisponible || cand.yaEnUso;
+                    return (
+                        <button
+                          key={cand.nombre}
+                          disabled={isDisabled && !esSeleccionado}
+                          onClick={() => !isDisabled && onAsignar(orden.nroOrden, idx, cand.nombre, false)}
+                          className={`flex items-center gap-2 p-2 rounded-xl text-left transition-all border group relative
+                            ${esSeleccionado ? 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-pf-red/50' : 'bg-white border-slate-200'}
+                            ${!isDisabled && !esSeleccionado ? 'hover:border-pf-red hover:shadow-md cursor-pointer' : ''}
+                            ${isDisabled && !esSeleccionado ? 'opacity-40 grayscale cursor-not-allowed bg-slate-50' : ''}
+                          `}
+                        >
+                          <div className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black
+                            ${cand.estaDisponible ? (cand.esExento ? 'bg-purple-500 text-white' : 'bg-pf-red text-white') : 'bg-slate-100 text-slate-400'}
+                            ${cand.yaEnUso ? '!bg-amber-500 !text-white' : ''} 
+                          `}>
+                            {cand.yaEnUso ? 'X' : (cand.esExento ? <ShieldCheck size={12}/> : (cand.estaDisponible ? (esSabado ? 'S' : 'N') : cand.turnoDia))}
+                          </div>
+                          <div className="flex flex-col overflow-hidden min-w-0">
+                              <span className="text-[10px] font-bold truncate leading-tight">{cand.nombre}</span>
+                              <span className="text-[8px] opacity-70 font-bold uppercase">{cand.esExento ? "Exento" : ""}</span>
+                          </div>
+                        </button>
+                    )
+                  })}
+                </div>
               </div>
             );
           })}

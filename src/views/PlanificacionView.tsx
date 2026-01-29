@@ -3,14 +3,14 @@ import { Calendario } from "../components/planificacion/Calendario";
 import { PanelLateral } from "../components/planificacion/PanelLateral";
 import { Wand2, CheckCircle2 } from "lucide-react"; // Importar iconos
 
+import { 
+  esPlantaCompatible, 
+  rolesCoinciden, 
+  necesitaValidacionTurno 
+} from "../utils/planificacionUtils"; 
+
 // Helpers para lógica de turnos (reutilizados del modal)
 const BLOQUEOS_SABADO = ['L', 'V', 'LIC', 'LM', 'LP'];
-
-const rolesCoinciden = (rolA: string, rolB: string) => {
-    const r1 = String(rolA || "").trim().toUpperCase().charAt(0);
-    const r2 = String(rolB || "").trim().toUpperCase().charAt(0);
-    return r1 === r2;
-};
 
 export const PlanificacionView = ({ 
   planResult, 
@@ -22,7 +22,8 @@ export const PlanificacionView = ({
   planResultSinAsignar,
   mapaHorarios,
   onEditTecnicos,
-  fechaSeleccionada
+  fechaSeleccionada,
+  isNocheValid
 }: any) => {
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
   const [draggingOT, setDraggingOT] = useState<any>(null);
@@ -49,39 +50,47 @@ export const PlanificacionView = ({
   const handleSugerirTodo = () => {
     let cambiosRealizados = 0;
 
-    // 1. Calculamos las nuevas versiones SOLO para las órdenes visibles (Planta actual)
+    // Convertimos mapa a array para filtrar
+    const listaEmpleados = Array.from(empleadosMap.values()).map((v: any, i) => ({
+        ...v, 
+        key: Array.from(empleadosMap.keys())[i]
+    }));
+
+    // 1. Calculamos nuevas versiones
     const ordenesDeEstaPlantaActualizadas = planResult.map((ot: any) => {
-        // Si la orden no tiene vacantes, la saltamos (se queda igual)
         const tieneVacantes = ot.tecnicos.some((t: any) => t.nombre === 'VACANTE');
         if (!tieneVacantes) return ot;
 
-        // Datos de fecha
         const [d, m, y] = ot.fechaSugerida.split('/').map(Number);
         const diaIndex = d - 1;
         const fechaObj = new Date(y, m - 1, d);
         const esSabado = fechaObj.getDay() === 6;
 
-        // Lista local de asignados
         const asignadosEnEstaOT = ot.tecnicos
             .map((t: any) => t.nombre)
             .filter((n: string) => n !== 'VACANTE');
 
-        // Procesar técnicos
         const nuevosTecnicos = ot.tecnicos.map((slot: any) => {
             if (slot.nombre !== 'VACANTE') return slot;
 
             const rolRequerido = slot.rol;
 
+            // FILTRO 1: Rol Exacto y Planta Compatible (Incluyendo CI)
             const candidatos = listaEmpleados.filter((emp: any) => {
-                const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
-                const mismaPlanta = emp.planta === ot.planta || ot.planta === 'OTROS';
-                return mismoRol && mismaPlanta;
+                const rolOk = rolesCoinciden(rolRequerido, emp.rol);
+                const plantaOk = esPlantaCompatible(emp.planta, ot.planta);
+                return rolOk && plantaOk;
             });
 
+            // FILTRO 2: Disponibilidad (Turnos)
             const mejorCandidato = candidatos.find((cand: any) => {
                 const nombre = cand.key || cand.nombre;
                 if (asignadosEnEstaOT.includes(nombre)) return false;
 
+                // SI NO REQUIERE VALIDACIÓN (SUPERVISOR/SE), PASA DIRECTO
+                if (!necesitaValidacionTurno(cand.rol)) return true;
+
+                // SI REQUIERE, VALIDAMOS TURNO
                 const turnos = mapaHorarios.get(nombre);
                 if (!turnos) return false;
 
@@ -106,7 +115,6 @@ export const PlanificacionView = ({
                     esSugerido: true
                 };
             }
-
             return slot;
         });
 
@@ -116,15 +124,10 @@ export const PlanificacionView = ({
     // 2. ACTUALIZAMOS EL ESTADO GLOBAL SIN BORRAR LAS OTRAS PLANTAS
     if (cambiosRealizados > 0) {
         setPlanResult((prevGlobal: any[]) => {
-            // Recorremos TODAS las órdenes de la app (prevGlobal)
             return prevGlobal.map((otGlobal: any) => {
-                // Buscamos si esta orden global corresponde a una de las que acabamos de modificar en esta vista
                 const otModificada = ordenesDeEstaPlantaActualizadas.find(
                     (otLocal: any) => otLocal.nroOrden === otGlobal.nroOrden
                 );
-                
-                // Si encontramos una versión modificada (de la planta actual), la usamos.
-                // Si no, dejamos la orden original (de otra planta o sin cambios).
                 return otModificada || otGlobal;
             });
         });
@@ -194,17 +197,6 @@ export const PlanificacionView = ({
     setMensajeExito("Planificación Actualizada");
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 2000);
-  };
-
-  const isNocheValid = (tecnicos: any[], fechaStr: string) => {
-    if (!mapaHorarios || !tecnicos || tecnicos.length === 0) return false;
-    return tecnicos.every((tec: any) => {
-       if (tec.nombre === "OT NUEVA" || tec.nombre === "SIN HISTORIAL" || tec.nombre === "VACANTE") return true;
-       const turnos = mapaHorarios.get(tec.nombre);
-       if (!turnos) return false; 
-       const dia = parseInt(fechaStr.split('/')[0]);
-       return turnos[dia - 1]?.trim().toUpperCase() === 'N';
-    });
   };
 
   return (

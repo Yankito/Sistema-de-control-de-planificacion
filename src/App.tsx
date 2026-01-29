@@ -21,9 +21,13 @@ import { processSeguimiento } from "./logic/seguimientoProcessor";
 import { SeguimientoView } from "./views/SeguimientoView";
 import { SeguimientoResult } from "./types";
 import { AtrasoRow } from "./logic/atrasosProcessor";
-// IMPORTAR EL MODAL
 import { ModalAsignacionTecnico } from './components/planificacion/ModalAsignacionTecnico';
 import { SeguimientoTecnicosView } from "./views/SeguimientoTecnicosView";
+import { 
+  esPlantaCompatible, 
+  necesitaValidacionTurno, 
+  PLANTAS_CI 
+} from "./utils/planificacionUtils";
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
@@ -32,7 +36,7 @@ function App() {
   const [planResultSinAsignar, setPlanResultSinAsignar] = useState<any[]>([]);
   const [horariosResult, setHorariosResult] = useState<HorarioTecnico[]>([]);
   const [workbookActual, setWorkbookActual] = useState<XLSX.WorkBook | null>(null);
-  const [plantas] = useState(["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "SADEMA"]);
+  const [plantas] = useState(["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"]);
   const [empleadosMap, setEmpleadosMap] = useState<Map<string, any>>(new Map());
   const [archivoCargado, setArchivoCargado] = useState(false);
   const [atrasosResult, setAtrasosResult] = useState<AtrasoRow[]>([]);
@@ -228,6 +232,25 @@ function App() {
     setFechaFoco(fechaDestino);
   };
 
+  const isNocheValid = (tecnicos: any[], fechaStr: string) => {
+    if (!mapaHorariosActual || !tecnicos || tecnicos.length === 0) return false;
+    
+    return tecnicos.every((tec: any) => {
+       if (["OT NUEVA", "SIN HISTORIAL", "VACANTE"].includes(tec.nombre)) return true;
+
+       const datosEmp = empleadosMap.get(tec.nombre);
+       const rolEmp = datosEmp ? datosEmp.rol : "M";
+
+       if (!necesitaValidacionTurno(rolEmp)) return true;
+
+       const turnos = mapaHorariosActual.get(tec.nombre);
+       if (!turnos) return false; 
+       
+       const dia = parseInt(fechaStr.split('/')[0]);
+       return turnos[dia - 1]?.trim().toUpperCase() === 'N';
+    });
+  };
+
   return (
     <div className="flex h-screen bg-pf-light text-slate-800 font-sans">
       <Sidebar 
@@ -294,6 +317,7 @@ function App() {
                       setModalTecnicoOpen(true);
                   }}
                   fechaSeleccionada={fechaFoco}
+                  isNocheValid={isNocheValid}
                 />
               )}
 
