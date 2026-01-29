@@ -23,6 +23,7 @@ import { SeguimientoResult } from "./types";
 import { AtrasoRow } from "./logic/atrasosProcessor";
 // IMPORTAR EL MODAL
 import { ModalAsignacionTecnico } from './components/planificacion/ModalAsignacionTecnico';
+import { SeguimientoTecnicosView } from "./views/SeguimientoTecnicosView";
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
@@ -44,7 +45,8 @@ function App() {
   const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
   const [mapaHorariosActual, setMapaHorariosActual] = useState<Map<string, string[]>>(new Map());
-  const [listaEmpleadosArray, setListaEmpleadosArray] = useState<any[]>([]); // Para el modal
+  const [listaEmpleadosArray, setListaEmpleadosArray] = useState<any[]>([]);
+  const [fechaFoco, setFechaFoco] = useState<string | null>(null);
 
   // ESTADOS PARA EL MODAL DE ASIGNACIÓN
   const [modalTecnicoOpen, setModalTecnicoOpen] = useState(false);
@@ -217,6 +219,15 @@ function App() {
     });
   };
 
+  const handleNavegarDesdeCarga = (plantaDestino: string, fechaDestino: string) => {
+    // Cambiamos a la tab de planificación
+    setActiveTab("plan");
+
+    // Cambiamos la planta para ver la orden correcta
+    setPlantaPlan(plantaDestino);
+    setFechaFoco(fechaDestino);
+  };
+
   return (
     <div className="flex h-screen bg-pf-light text-slate-800 font-sans">
       <Sidebar 
@@ -282,6 +293,7 @@ function App() {
                       setOrdenEditando(orden);
                       setModalTecnicoOpen(true);
                   }}
+                  fechaSeleccionada={fechaFoco}
                 />
               )}
 
@@ -298,6 +310,13 @@ function App() {
           )}
           {activeTab === "atrasos" && atrasosResult.length > 0 && <SeguimientoOTsView data={atrasosResult} dataAnterior={atrasosAnterior} />}
           {activeTab === "seguimiento" && <SeguimientoView dataMantencion={seguimientoResult.mantencion} dataInfra={seguimientoResult.infraestructura} />}
+          {activeTab === "carga" && (
+            <SeguimientoTecnicosView 
+                  planResult={planResult} 
+                  plantas={plantas}
+                  onNavegar={handleNavegarDesdeCarga}
+              />
+          )}
         </section>
       </main>
 

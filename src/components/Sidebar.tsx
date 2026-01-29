@@ -26,6 +26,7 @@ export const Sidebar = ({
     { id: 'maestro', label: 'Maestro Excel', icon: FileSpreadsheet, locked: !archivoCargado },
     { id: 'plan', label: 'Planificación', icon: CalendarCheck, locked: !archivoCargado },
     { id: 'gantt', label: 'Gantt Turnos', icon: Calendar, locked: !archivoCargado },
+    { id: 'carga', label: 'Seguimiento Técnicos', icon: ClipboardList, locked: !archivoCargado },
     { id: 'atrasos', label: 'Atrasos/KPI', icon: Clock, locked: !tieneAtrasos },
     { id: 'seguimiento', label: 'Seguimiento OT', icon: ClipboardList, locked: !tieneSeguimiento },
   ];

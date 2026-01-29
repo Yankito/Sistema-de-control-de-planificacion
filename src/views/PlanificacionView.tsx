@@ -21,7 +21,8 @@ export const PlanificacionView = ({
   empleadosMap, 
   planResultSinAsignar,
   mapaHorarios,
-  onEditTecnicos 
+  onEditTecnicos,
+  fechaSeleccionada
 }: any) => {
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
   const [draggingOT, setDraggingOT] = useState<any>(null);
@@ -38,12 +39,19 @@ export const PlanificacionView = ({
       }));
   }, [empleadosMap]);
 
+  useEffect(() => {
+    if (fechaSeleccionada) {
+      setDiaSeleccionado(fechaSeleccionada);
+    }
+  }, [fechaSeleccionada]);
+
   // --- FUNCIÓN: SUGERIR TÉCNICOS MASIVAMENTE ---
   const handleSugerirTodo = () => {
     let cambiosRealizados = 0;
 
-    const nuevoPlan = planResult.map((ot: any) => {
-        // Si la orden no tiene vacantes, la saltamos
+    // 1. Calculamos las nuevas versiones SOLO para las órdenes visibles (Planta actual)
+    const ordenesDeEstaPlantaActualizadas = planResult.map((ot: any) => {
+        // Si la orden no tiene vacantes, la saltamos (se queda igual)
         const tieneVacantes = ot.tecnicos.some((t: any) => t.nombre === 'VACANTE');
         if (!tieneVacantes) return ot;
 
@@ -53,7 +61,7 @@ export const PlanificacionView = ({
         const fechaObj = new Date(y, m - 1, d);
         const esSabado = fechaObj.getDay() === 6;
 
-        // Lista local de asignados en esta OT para evitar duplicados internos
+        // Lista local de asignados
         const asignadosEnEstaOT = ot.tecnicos
             .map((t: any) => t.nombre)
             .filter((n: string) => n !== 'VACANTE');
@@ -64,21 +72,16 @@ export const PlanificacionView = ({
 
             const rolRequerido = slot.rol;
 
-            // 1. Filtramos candidatos (Mismo Rol y Planta)
             const candidatos = listaEmpleados.filter((emp: any) => {
                 const mismoRol = rolesCoinciden(emp.rol, rolRequerido);
                 const mismaPlanta = emp.planta === ot.planta || ot.planta === 'OTROS';
                 return mismoRol && mismaPlanta;
             });
 
-            // 2. Buscamos el primero disponible
             const mejorCandidato = candidatos.find((cand: any) => {
                 const nombre = cand.key || cand.nombre;
-                
-                // Evitar duplicados en la misma OT
                 if (asignadosEnEstaOT.includes(nombre)) return false;
 
-                // Chequear Turno
                 const turnos = mapaHorarios.get(nombre);
                 if (!turnos) return false;
 
@@ -95,32 +98,45 @@ export const PlanificacionView = ({
             if (mejorCandidato) {
                 cambiosRealizados++;
                 const nombreFinal = mejorCandidato.key || mejorCandidato.nombre;
-                asignadosEnEstaOT.push(nombreFinal); // Marcar como usado
+                asignadosEnEstaOT.push(nombreFinal);
                 
                 return { 
                     ...slot, 
                     nombre: nombreFinal,
-                    esSugerido: true // <--- MARCA PARA EL ÍCONO
+                    esSugerido: true
                 };
             }
 
-            return slot; // Si no hay nadie, sigue VACANTE
+            return slot;
         });
 
         return { ...ot, tecnicos: nuevosTecnicos };
     });
 
+    // 2. ACTUALIZAMOS EL ESTADO GLOBAL SIN BORRAR LAS OTRAS PLANTAS
     if (cambiosRealizados > 0) {
-        setPlanResult(nuevoPlan);
+        setPlanResult((prevGlobal: any[]) => {
+            // Recorremos TODAS las órdenes de la app (prevGlobal)
+            return prevGlobal.map((otGlobal: any) => {
+                // Buscamos si esta orden global corresponde a una de las que acabamos de modificar en esta vista
+                const otModificada = ordenesDeEstaPlantaActualizadas.find(
+                    (otLocal: any) => otLocal.nroOrden === otGlobal.nroOrden
+                );
+                
+                // Si encontramos una versión modificada (de la planta actual), la usamos.
+                // Si no, dejamos la orden original (de otra planta o sin cambios).
+                return otModificada || otGlobal;
+            });
+        });
+
         setMensajeExito(`Se asignaron ${cambiosRealizados} técnicos automáticamente`);
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
     } else {
-        alert("No se encontraron técnicos disponibles para cubrir las vacantes restantes.");
+        alert("No se encontraron técnicos disponibles para cubrir las vacantes restantes en esta planta.");
     }
   };
 
-  // ... (Resto de useEffects y useMemo igual que antes) ...
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
     document.addEventListener('dragover', preventDefault);
@@ -148,7 +164,6 @@ export const PlanificacionView = ({
     }, {});
   }, [datosOrdenados]);
 
-  // ... (Handlers de Drag & Drop igual) ...
   const handleDragStart = (e: React.DragEvent, ot: any) => {
     e.dataTransfer.setData("text/plain", JSON.stringify(ot));
     e.dataTransfer.effectAllowed = "move";
@@ -197,12 +212,9 @@ export const PlanificacionView = ({
       
       {/* BOTÓN FLOTANTE O EN HEADER PARA SUGERIR TODO */}
       <div className="absolute top-[-80px] right-64 z-50"> 
-         {/* Nota: Ajusta la posición según tu layout del Sidebar/Header principal, 
-             o mejor pásalo como prop al componente Calendario si prefieres que esté dentro de la caja blanca */}
       </div>
 
       <div className="flex-1 flex flex-col gap-6 relative">
-         {/* Si quieres el botón dentro del Calendario, debes pasarlo como prop o renderizarlo aquí encima */}
          
          {/* BARRA DE ACCIONES SUPERIOR (Opcional, encima del calendario) */}
          <div className="flex justify-end mb-[-60px] relative z-20 px-8 pointer-events-none">
