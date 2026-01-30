@@ -18,63 +18,68 @@ const parseDineroLocal = (valor: any): number => {
   return isNaN(numero) ? 0 : numero;
 };
 
-// Helper para fecha: Aseguramos horas en 00:00:00 para evitar errores de cálculo
-const parseFechaLocal = (valor: any): Date => {
+// Helper para fecha corregido y robusto
+const parseFechaLocal = (valor: any): Date | null => {
+  if (!valor) return null;
+
   let fecha: Date | null = null;
 
-  // Caso 1: Excel Serial
+  // Caso 1: Excel Serial (Número puro)
   if (typeof valor === 'number') {
+    // Ajuste Excel (Base 1900) - 25569 días offset unix
     fecha = new Date(Math.round((valor - 25569) * 86400 * 1000));
   }
-  // Caso 2: String DD/MM/YYYY
-  else if (typeof valor === 'string' && valor.includes('/')) {
-    const partes = valor.split('/');
-    if (partes.length === 3) {
-      const dia = parseInt(partes[0], 10);
-      const mes = parseInt(partes[1], 10) - 1;
-      const anio = parseInt(partes[2], 10);
-      fecha = new Date(anio, mes, dia);
+  // Caso 2: String que parece número (ej: "45321")
+  else if (typeof valor === 'string' && !isNaN(Number(valor)) && !valor.includes('/') && !valor.includes('-')) {
+     fecha = new Date(Math.round((Number(valor) - 25569) * 86400 * 1000));
+  }
+  // Caso 3: String con formato DD/MM/YYYY o YYYY-MM-DD
+  else if (typeof valor === 'string') {
+    // Intento DD/MM/YYYY
+    if (valor.includes('/')) {
+        const partes = valor.split('/');
+        if (partes.length === 3) {
+            // Asumimos DD/MM/YYYY
+            const dia = parseInt(partes[0], 10);
+            const mes = parseInt(partes[1], 10) - 1;
+            const anio = parseInt(partes[2], 10);
+            // Si el año es de 2 dígitos (ej: 24), asumimos 2000
+            const anioFull = anio < 100 ? 2000 + anio : anio;
+            fecha = new Date(anioFull, mes, dia);
+        }
+    } 
+    // Intento ISO YYYY-MM-DD
+    else if (valor.includes('-')) {
+        fecha = new Date(valor);
+    }
+    // Intento estándar
+    else {
+        fecha = new Date(valor);
     }
   }
-  // Caso 3: Fallback
-  else {
-    fecha = new Date(valor);
-  }
 
-  // Normalizar a media noche para comparaciones limpias
+  // Validación final: Si es inválida o NaN, devolvemos null (NO devuelve "new Date()" para no falsear datos)
   if (fecha && !isNaN(fecha.getTime())) {
     fecha.setHours(0, 0, 0, 0);
     return fecha;
   }
   
-  return new Date(); // Fallback de emergencia
+  return null; 
 };
 
-// --- LÓGICA CORREGIDA DE SEMANAS ---
-const calcularSemana = (fecha: Date): number => {
-  const anio = fecha.getFullYear();
-  const mes = fecha.getMonth(); // 0 = Enero
-  const dia = fecha.getDate();
-
-  // REGLA: Del 1 al 4 de Enero es SIEMPRE Semana 1
-  if (mes === 0 && dia < 5) {
-    return 1;
-  }
-
-  // REGLA: Desde el 5 de Enero en adelante, empieza la Semana 2
-  const inicioS2 = new Date(anio, 0, 5); // 5 de Enero
-
-  // Calculamos la diferencia en milisegundos
-  const diffTime = fecha.getTime() - inicioS2.getTime();
-  
-  // Si por alguna razón la fecha es menor (ej. año anterior), fallback
-  if (diffTime < 0) return 52; 
-
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  // Cálculo: (Días pasados desde el 5 Ene / 7) + 2
-  // +2 porque empezamos contando desde la semana 2
-  return Math.floor(diffDays / 7) + 2;
+// --- CÁLCULO DE SEMANA ESTÁNDAR (ISO 8601 Compatible) ---
+// Esto asegura consistencia entre años (Lunes a Domingo)
+const calcularSemana = (d: Date): number => {
+  // Copiamos fecha para no mutar original
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  // Establecer al jueves más cercano: current date + 4 - current day number
+  // Hace que el domingo sea 7
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  // Obtener primer día del año
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  // Calcular número de semanas completas hasta la fecha
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return weekNo;
 };
 
 export const processFallasData = (sheets: XLSX.WorkBook['Sheets']): FallaRow[] => {
@@ -87,18 +92,25 @@ export const processFallasData = (sheets: XLSX.WorkBook['Sheets']): FallaRow[] =
   }
 
   const rawData: any[] = XLSX.utils.sheet_to_json(sheet);
+  const rowsProcesadas: FallaRow[] = [];
 
-  return rawData.map((row) => {
+  rawData.forEach((row, index) => {
     const fechaObj = parseFechaLocal(row["Fecha"]);
-    // Forzamos el recálculo si parseFechaLocal devolvió algo raro, 
-    // pero idealmente confiamos en fechaObj
-    const semana = calcularSemana(fechaObj);
 
+    // SI LA FECHA ES INVÁLIDA, SALTAMOS LA FILA
+    // Esto evita que datos corruptos aparezcan como "hoy"
+    if (!fechaObj) {
+        // Opcional: Log para depurar qué filas fallan
+        // console.warn(`Fila ${index + 2} tiene fecha inválida:`, row["Fecha"]);
+        return;
+    }
+
+    const semana = calcularSemana(fechaObj);
     const duracion = parseDineroLocal(row["Duración Paro Oracle [min]"]);
     const gasto = parseDineroLocal(row["Gasto OM [$]"]);
     const perdida = parseDineroLocal(row["Pérdida por Paro [kg]"]);
 
-    return {
+    rowsProcesadas.push({
       fecha: fechaObj,
       anio: fechaObj.getFullYear(),
       mes: fechaObj.getMonth(),
@@ -115,6 +127,9 @@ export const processFallasData = (sheets: XLSX.WorkBook['Sheets']): FallaRow[] =
       gasto: gasto,
       perdidaKg: perdida,
       descripcionOperador: String(row["Descripción Operador"] || ""),
-    };
+    });
   });
+
+  // Ordenamos por fecha descendente para ver lo más reciente primero
+  return rowsProcesadas.sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 };
