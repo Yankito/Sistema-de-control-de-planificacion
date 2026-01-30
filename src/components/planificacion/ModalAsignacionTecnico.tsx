@@ -1,8 +1,9 @@
-import { X, Moon, UserMinus, Plus, Trash2, Wand2, ShieldCheck } from "lucide-react";
+import { X, Moon, UserMinus, Plus, Trash2, Wand2, ShieldCheck, User } from "lucide-react";
 import { 
   esPlantaCompatible, 
   rolesCoinciden, 
-  necesitaValidacionTurno 
+  necesitaValidacionTurno,
+  CONFIG_ROLES
 } from "../../utils/planificacionUtils";
 interface Props {
   isOpen: boolean;
@@ -122,7 +123,7 @@ export const ModalAsignacionTecnico = ({
                 'CALDERA': 'Caldera',
                 'SE': 'Servicio Externo'
             };
-            const etiquetaRol = mapeoRoles[slot.rol] || slot.rol;
+            const config = CONFIG_ROLES[slot.rol] || { label: slot.rol, color: 'bg-slate-500', text: 'text-slate-500' };
 
             const candidatos = empleados.filter((emp: any) => {
                 return rolesCoinciden(slot.rol, emp.rol) && esPlantaCompatible(emp.planta, orden.planta);
@@ -151,17 +152,26 @@ export const ModalAsignacionTecnico = ({
               <div key={idx} className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm relative group/card">
                 <div className="flex justify-between mb-3 items-center border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
+                      {/* Aplicación de Color Dinámico al Texto del Rol */}
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                        Puesto {idx + 1}: <span className="text-pf-red">{etiquetaRol}</span>
+                        Puesto {idx + 1}: <span className={config.text}>{config.label}</span>
                       </span>
                       <button onClick={() => onModificarCupos(orden.nroOrden, 'REMOVE', undefined, idx)} className="opacity-0 group-hover/card:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all">
                         <Trash2 size={12}/>
                       </button>
                   </div>
                   <div className="flex items-center gap-2">
+                      {/* Aplicación de Color al Icono de Usuario (tu duda original) */}
+                      {slot.nombre !== 'VACANTE' && (
+                        <div className={`flex items-center gap-1 mr-2 ${config.text}`}>
+                           <User size={12} className="fill-current" />
+                        </div>
+                      )}
+
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${slot.nombre === 'VACANTE' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-700'}`}>
                         Actual: {slot.nombre}
                       </span>
+                      
                       {slot.nombre !== 'VACANTE' && (
                           <button onClick={() => onAsignar(orden.nroOrden, idx, "VACANTE")} className="p-1 bg-red-50 text-red-500 rounded hover:bg-red-100 hover:text-red-700 transition-colors">
                             <UserMinus size={14}/>

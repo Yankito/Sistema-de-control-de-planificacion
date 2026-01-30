@@ -1,7 +1,7 @@
 import { useMemo } from "react"; 
 import { X, Move, User, Info, Calendar, Sparkles } from "lucide-react";
+import { CONFIG_ROLES } from "../../utils/planificacionUtils";
 
-// --- Helpers ---
 const getWeekNumber = (d: Date) => {
   const inicioSemana1 = new Date(2026, 0, 5); 
   const fechaActual = new Date(d);
@@ -22,7 +22,6 @@ interface PanelLateralProps {
   handleDragEnd: () => void;
   plantaSeleccionada: string;
   onEditTecnicos: (orden: any) => void;
-  // NUEVA PROP
   mostrarSoloVacantes: boolean;
 }
 
@@ -183,12 +182,17 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEdi
       
       <div className="pl-2 space-y-2">
         <div className="flex flex-col gap-1">
-          {listaTecnicos.map((tec: any, idx: number) => (
+          {listaTecnicos.map((tec: any, idx: number) => {
+            const config = CONFIG_ROLES[tec.rol] || { label: tec.rol, color: 'bg-slate-500', text: 'text-slate-500' };
+            return(
+            
             <div key={idx} className="flex items-center justify-between"> 
                 <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase w-full">
-                    <User size={10} className={tec.rol === 'E' ? "text-yellow-500" : "text-blue-500"} /> 
+                  <div className={`flex items-center gap-1 ${config.text}`}>
+                      <User size={10} className="fill-current" />
+                  </div>
                     
-                    <span className={`truncate flex-1 ${tec.nombre === "VACANTE" ? "text-amber-500 font-black" : ""}`}>
+                    <span className={`truncate flex-1 ${tec.nombre === "VACANTE" ? config.text : ""}`}>
                        {tec.nombre}
                     </span>
 
@@ -200,7 +204,8 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEdi
                     )}
                 </div>
             </div>
-          ))}
+            )
+          })}
           
           {esAsignada && (
               <button 
