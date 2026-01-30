@@ -27,3 +27,12 @@ export const necesitaValidacionTurno = (rol: string) => {
   const r = String(rol || "").trim().toUpperCase();
   return !ROLES_NO_VALIDAN_TURNO.includes(r);
 };
+
+export const CONFIG_ROLES: Record<string, { label: string, color: string, text: string }> = {
+  'M': { label: 'Mecánico', color: 'bg-blue-600', text: 'text-blue-600' },
+  'E': { label: 'Eléctrico', color: 'bg-yellow-600', text: 'text-yellow-500' },
+  'SADEMA': { label: 'Sadema', color: 'bg-emerald-600', text: 'text-emerald-500' },
+  'SUPERVISOR': { label: 'Supervisor', color: 'bg-purple-600', text: 'text-purple-500' },
+  'CALDERA': { label: 'Caldera', color: 'bg-pink-600', text: 'text-pink-500' },
+  'SE': { label: 'Servicio Externo', color: 'bg-slate-600', text: 'text-slate-500' },
+};
