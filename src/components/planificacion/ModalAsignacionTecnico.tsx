@@ -1,4 +1,4 @@
-import { X, UserCheck, UserX, Moon, AlertCircle, UserMinus, Plus, Trash2, Wand2, ShieldCheck } from "lucide-react";
+import { X, Moon, UserMinus, Plus, Trash2, Wand2, ShieldCheck } from "lucide-react";
 import { 
   esPlantaCompatible, 
   rolesCoinciden, 

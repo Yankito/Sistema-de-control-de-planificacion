@@ -23,10 +23,8 @@ import { SeguimientoResult } from "./types";
 import { AtrasoRow } from "./logic/atrasosProcessor";
 import { ModalAsignacionTecnico } from './components/planificacion/ModalAsignacionTecnico';
 import { SeguimientoTecnicosView } from "./views/SeguimientoTecnicosView";
-import { 
-  esPlantaCompatible, 
-  necesitaValidacionTurno, 
-  PLANTAS_CI 
+import {  
+  necesitaValidacionTurno,  
 } from "./utils/planificacionUtils";
 import { processFallasData } from "./logic/fallasProcessor";
 import { FallasView } from "./views/FallasView";
@@ -52,7 +50,6 @@ function App() {
   const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
   const [mapaHorariosActual, setMapaHorariosActual] = useState<Map<string, string[]>>(new Map());
-  const [listaEmpleadosArray, setListaEmpleadosArray] = useState<any[]>([]);
   const [fechaFoco, setFechaFoco] = useState<string | null>(null);
 
   // ESTADOS PARA EL MODAL DE ASIGNACIÓN
@@ -149,7 +146,6 @@ function App() {
       setMapaHorariosActual(horarios);
       
       // Convertir mapa a array para el modal
-      setListaEmpleadosArray(Array.from(mapaCargado.values()));
     }
   };
 

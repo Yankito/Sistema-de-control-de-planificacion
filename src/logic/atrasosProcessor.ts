@@ -116,11 +116,16 @@ export const processAtrasos = (sheets: { [key: string]: XLSX.WorkSheet }): Atras
       if (nombreHoja === "MP3") {
         const nroActivoFull = String(fila["NÚMERO DE ACTIVO"] || "");
         const matchCC = nroActivoFull.match(/\((\d)(\d{3})\)/); // Busca el Centro de Costo (X000)
-        
+        console.log("Match CC:", matchCC);
+        if(matchCC && matchCC[0] === "(1630)"){
+          console.log("aqui");
+        }
         if (matchCC) {
           const primerDigito = matchCC[1];
           const activo = dfActivos.find(a => String(a["CC"] || "").trim() === matchCC[0]);
-          
+          if(matchCC && matchCC[0] === "1630"){
+            console.log("Activo encontrado:", activo);
+          }
           if (activo && activo["PLANTA"]) {
             plantaReal = String(activo["PLANTA"]).trim().toUpperCase();
           } else {

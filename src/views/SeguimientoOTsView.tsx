@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { AtrasoRow } from "../logic/atrasosProcessor";
-import { X, Search, FileText, LayoutGrid, Factory, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Search, FileText, Factory, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { OTCard } from "./atrasos/OTCard";
 import { EmployeeProfile } from "./atrasos/EmployeeProfile";
 import { ResumenTable } from "../components/seguimiento/ResumenTable";

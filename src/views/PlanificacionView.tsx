@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Calendario } from "../components/planificacion/Calendario";
 import { PanelLateral } from "../components/planificacion/PanelLateral";
-import { Wand2, CheckCircle2 } from "lucide-react"; // Importar iconos
+import { Wand2 } from "lucide-react"; // Importar iconos
 
 import { 
   esPlantaCompatible, 
@@ -32,13 +32,6 @@ export const PlanificacionView = ({
   const [mensajeExito, setMensajeExito] = useState("Planificación Actualizada"); // Nuevo estado para mensaje
   const [mostrarSoloVacantes, setMostrarSoloVacantes] = useState(false);
 
-  // Convertimos el mapa de empleados a array una sola vez para iterar rápido
-  const listaEmpleados = useMemo(() => {
-      return Array.from(empleadosMap.values()).map((v: any, i) => ({
-          ...v, 
-          key: Array.from(empleadosMap.keys())[i]
-      }));
-  }, [empleadosMap]);
 
   useEffect(() => {
     if (fechaSeleccionada) {

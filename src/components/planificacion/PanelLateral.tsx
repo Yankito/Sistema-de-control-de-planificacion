@@ -194,7 +194,9 @@ const TarjetaOrden = ({ orden, handleDragStart, handleDragEnd, esAsignada, onEdi
 
                     {/* ÍCONO DE SUGERIDO POR ALGORITMO */}
                     {tec.esSugerido && (
-                        <Sparkles size={10} className="text-purple-500 ml-1 fill-purple-100" title="Sugerido automáticamente" />
+                        <div title="Sugerido automáticamente">
+                            <Sparkles size={10} className="text-purple-500 ml-1 fill-purple-100" />
+                        </div>
                     )}
                 </div>
             </div>

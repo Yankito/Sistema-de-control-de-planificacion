@@ -19,7 +19,7 @@ interface DashboardProps {
 
 export const DashboardView = ({ planResult, onEjecutarPlan }: DashboardProps) => {
   const tienePlan = planResult.length > 0;
-  const mecanicosUnicos = [...new Set(planResult.map(r => r.mecanico))].length;
+  const mecanicosUnicos = [...new Set(planResult.map(r => r.tecnicos.map(t => t.nombre)).flat())].length;
 
   const frecuenciaEstable = planResult.filter(p => {
     if (!p.fechaAnterior || p.fechaAnterior === "N/A") return false;

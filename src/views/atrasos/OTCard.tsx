@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, User } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 
 interface OTCardProps {
   item: any;

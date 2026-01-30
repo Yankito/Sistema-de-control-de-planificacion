@@ -90,7 +90,7 @@ export const FallasView = ({ data }: Props) => {
     }
     return { chartData, maxVal };
   }, [data, anioFiltro, plantaFiltro, filtroDrill]);
-  
+
   // --- 4. FILTRO MAESTRO (Aplica TODO, incluyendo semana) ---
   const datosFiltrados = useMemo(() => {
     return data.filter(d => {
@@ -187,6 +187,10 @@ export const FallasView = ({ data }: Props) => {
                     {/* Texto dinámico de fecha */}
                     Visualizando: <span className="font-bold text-slate-700">{rangoTextoHeader}</span>
                 </p>
+                <p className="text-sm text-slate-500 font-medium">
+                    {/* Texto dinámico de planta */}
+                    Planta: <span className="font-bold text-slate-700">{plantaFiltro === "TODAS" ? "Todas las Plantas" : plantaFiltro}</span>
+                </p>
                 {filtroDrill?.tipo === 'EQUIPO' && (
                     <button 
                         onClick={() => setActivoSeleccionado(filtroDrill.valor)}
@@ -208,7 +212,10 @@ export const FallasView = ({ data }: Props) => {
             {/* BOTÓN DE EXPORTACIÓN */}
             <ExportButton 
                 elementId="container-reporte-final" 
-                fileName={`Reporte_Fallas_${semanaFiltro === 'TODAS' ? 'Anual' : 'S'+semanaFiltro}`} 
+                fileName={` ${plantaFiltro}_${semanaFiltro === 'TODAS' ? 'Anual' : 'S'+semanaFiltro}`} 
+                plantaSeleccionada={plantaFiltro === "TODAS" ? "TODAS LAS PLANTAS" : plantaFiltro}
+                rangoTexto={rangoTextoHeader}
+                semana={semanaFiltro}
             />
             <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>
             <div className="bg-slate-100 p-1 rounded-xl flex">
@@ -236,7 +243,7 @@ export const FallasView = ({ data }: Props) => {
                 setFiltroDrill={setFiltroDrill} 
                 rangoTexto={rangoTextoHeader}
                 topN={topN}
-                setActivoSeleccionado={setActivoSeleccionado}
+
             />
         )}
 

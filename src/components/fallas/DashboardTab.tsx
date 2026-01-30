@@ -1,3 +1,4 @@
+// DashboardTab.tsx
 import { useState } from "react";
 import { Activity, DollarSign, Clock, Zap, BarChart3, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { KpiTile, HeaderSection, InteractiveBar } from "./FallasUI";
@@ -16,7 +17,7 @@ interface Props {
 
 export const DashboardTab = ({ 
     analytics, timelineStats, semanaFiltro, setSemanaFiltro,
-    filtroDrill, setFiltroDrill, rangoTexto, topN 
+    filtroDrill, setFiltroDrill, rangoTexto 
 }: Props) => {
   
   const { heroStats } = analytics;
@@ -264,7 +265,7 @@ export const DashboardTab = ({
             <div className="flex pt-6 pl-6 pr-6 justify-center items-center mb-2">
                 <HeaderSection icon={Zap} title="Mayor MTTR" color="text-purple-600" bg="bg-purple-50"/>
             </div>
-            <div className="flex-1 mt-4 space-y-3 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 mt-4 space-y-3 overflow-y-auto   custom-scrollbar">
                 {analytics.porMTTR.map((item: any, idx: number) => (
                     <InteractiveBar key={idx} label={item.label} value={`${item.mttr.toFixed(0)} min/falla`} percent={(item.mttr / analytics.porMTTR[0].mttr) * 100} color="bg-gradient-to-r from-purple-600 to-purple-400" active={filtroDrill?.valor === item.label} onClick={() => handleBarClick('EQUIPO', item.label)} />
                 ))}
