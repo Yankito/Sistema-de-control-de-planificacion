@@ -1,213 +1,298 @@
-// src/views/AtrasosView.tsx
 import { useState, useMemo } from "react";
 import { AtrasoRow } from "../logic/atrasosProcessor";
-import { X, Search, FileText, LayoutGrid, Factory, TrendingUp, TrendingDown, Minus, Download } from "lucide-react";
+import { 
+  Users, 
+  Package, 
+  CalendarClock, 
+  FileWarning, 
+  Search, 
+  X,
+  Filter,
+  Download
+} from "lucide-react";
 import * as XLSX from "xlsx";
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
-
-// Importamos los nuevos componentes
-import { OTCard } from "./atrasos/OTCard";
-import { EmployeeProfile } from "./atrasos/EmployeeProfile";
 
 interface Props {
   data: AtrasoRow[];
-  dataAnterior?: AtrasoRow[];
+  dataAnterior?: AtrasoRow[]; // Para comparar si bajó o subió
 }
 
-export const AtrasosView = ({ data, dataAnterior = [] }: Props) => {
-  const [viewDetail, setViewDetail] = useState<{ id: string, esOB: boolean, cat?: string, isGlobal?: boolean } | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS" });
+export const AtrasosView = ({ data }: Props) => {
+  const [filtroPlanta, setFiltroPlanta] = useState("TODAS");
+  const [busqueda, setBusqueda] = useState("");
+  const [drillDown, setDrillDown] = useState<{ tipo: string, valor: string } | null>(null);
 
-  const listaPlantas = ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"];
-  const categorias = ["TECNICO / SERVICIO", "PROGRAMADOR", "OC / OTRO"];
+  // --- 1. ESTADÍSTICAS GLOBALES ---
+  const stats = useMemo(() => {
+    const filtrada = filtroPlanta === "TODAS" ? data : data.filter(d => d.planta === filtroPlanta);
+    
+    return {
+      total: filtrada.length,
+      tecnico: filtrada.filter(d => d.clasificacion === "TECNICO / SERVICIO").length,
+      materiales: filtrada.filter(d => d.clasificacion === "MATERIALES" || d.clasificacion === "OC / OTRO").length,
+      programador: filtrada.filter(d => d.clasificacion === "PROGRAMADOR").length,
+      prev: filtrada.filter(d => d.esOB).length,
+      corr: filtrada.filter(d => !d.esOB).length
+    };
+  }, [data, filtroPlanta]);
 
-  // Filtrado General
-  const filteredGeneral = useMemo(() => {
-    if (!viewDetail) return [];
-    let filtered = data.filter(d => {
-      const matchTipo = d.esOB === viewDetail.esOB;
-      const matchCat = viewDetail.cat ? d.clasificacion === viewDetail.cat : true;
-      let matchPlanta = true;
-      if (viewDetail.isGlobal) {
-        if (viewDetail.id === "COMPLEJO") matchPlanta = d.planta !== "PF1" && d.planta !== "PF2";
-      } else { matchPlanta = (d.planta || "OTROS") === viewDetail.id; }
-      return matchTipo && matchCat && matchPlanta;
-    });
+  // --- 2. DATA PARA LA MATRIZ (Heatmap) ---
+  const matrizData = useMemo(() => {
+    const plantas = ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"];
+    return plantas.map(p => {
+      const dePlanta = data.filter(d => d.planta === p);
+      return {
+        planta: p,
+        tecnico: dePlanta.filter(d => d.clasificacion === "TECNICO / SERVICIO").length,
+        materiales: dePlanta.filter(d => d.clasificacion === "MATERIALES" || d.clasificacion === "OC / OTRO").length,
+        programador: dePlanta.filter(d => d.clasificacion === "PROGRAMADOR").length,
+        total: dePlanta.length
+      };
+    }).sort((a,b) => b.total - a.total); // Ordenar por quien tiene más problemas
+  }, [data]);
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(d => d.ot.toLowerCase().includes(term) || d.descripcion.toLowerCase().includes(term));
+  // --- 3. DATA FILTRADA (LISTA) ---
+  const listaDetalle = useMemo(() => {
+    let base = data;
+    if (filtroPlanta !== "TODAS") base = base.filter(d => d.planta === filtroPlanta);
+    
+    if (drillDown) {
+       if (drillDown.tipo === 'PLANTA') base = base.filter(d => d.planta === drillDown.valor);
+       if (drillDown.tipo === 'RESP') base = base.filter(d => d.clasificacion === drillDown.valor);
     }
 
-    const otsAnteriores = new Set(dataAnterior.map(d => d.ot));
-    return filtered.map(item => ({ ...item, isNew: dataAnterior.length > 0 && !otsAnteriores.has(item.ot) }));
-  }, [viewDetail, data, dataAnterior, searchTerm]);
+    if (busqueda) {
+        const lower = busqueda.toLowerCase();
+        base = base.filter(d => d.ot.toLowerCase().includes(lower) || d.descripcion.toLowerCase().includes(lower));
+    }
 
-  // Lógica del Técnico
-  const employeeData = useMemo(() => {
-    if (!selectedEmployee) return { orders: [], stats: { total: 0, cumplidas: 0, pendientes: 0 } };
-    let orders = data.filter(d => d.detallesTecnicos?.some(t => t.tecnico === selectedEmployee));
-    
-    if (empFilters.planta !== "TODAS") orders = orders.filter(d => d.planta === empFilters.planta);
-    if (empFilters.periodo !== "TODOS") orders = orders.filter(d => d.periodo === empFilters.periodo);
+    return base;
+  }, [data, filtroPlanta, drillDown, busqueda]);
 
-    const stats = {
-      total: orders.length,
-      cumplidas: orders.filter(o => o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada).length,
-      pendientes: 0
-    };
-    stats.pendientes = stats.total - stats.cumplidas;
-    return { orders, stats };
-  }, [selectedEmployee, data, empFilters]);
-
-  const handleExportarResumen = async () => {
-    if (data.length === 0) return;
-    try {
-      const dataExport = data.map(item => ({ ...item, detallesTecnicos: JSON.stringify(item.detallesTecnicos || []) }));
-      const ws = XLSX.utils.json_to_sheet(dataExport);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "RESUMEN_DATA");
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const filePath = await save({ filters: [{ name: 'Excel', extensions: ['xlsx'] }], defaultPath: `Resumen_Atrasos_PF_${new Date().toISOString().split('T')[0]}.xlsx` });
-      if (filePath) await writeFile(filePath, new Uint8Array(excelBuffer));
-    } catch (e) { console.error(e); }
+  const exportarExcel = () => {
+     const ws = XLSX.utils.json_to_sheet(listaDetalle.map(row => ({
+         OT: row.ot,
+         Planta: row.planta,
+         Descripcion: row.descripcion,
+         Responsable: row.clasificacion,
+         Tipo: row.esOB ? 'Preventiva (OB)' : 'Correctiva',
+         Tecnicos_Pendientes: row.detallesTecnicos?.filter(t => !t.finalizada).map(t => t.tecnico).join(", ")
+     })));
+     const wb = XLSX.utils.book_new();
+     XLSX.utils.book_append_sheet(wb, ws, "Detalle Atrasos");
+     XLSX.writeFile(wb, "Reporte_Atrasos.xlsx");
   };
 
-  const renderDiferencia = (actual: number, anterior: number) => {
-    if (dataAnterior.length === 0) return null;
-    const diff = actual - anterior;
-    if (diff > 0) return <span className="flex items-center gap-0.5 text-red-600 font-black text-[10px] ml-1"><TrendingUp size={10} /> +{diff}</span>;
-    if (diff < 0) return <span className="flex items-center gap-0.5 text-green-600 font-black text-[10px] ml-1"><TrendingDown size={10} /> {diff}</span>;
-    return <span className="flex items-center gap-0.5 text-slate-400 font-bold text-[10px] ml-1"><Minus size={10} /></span>;
-  };
-
-  const renderCuadro = (titulo: string, dataset: AtrasoRow[], esOB: boolean, isGlobal = false) => {
-    const datasetAnt = dataAnterior.filter(d => {
-      if (isGlobal) {
-        if (titulo === "COMPLEJO") return d.esOB === esOB && d.planta !== "PF1" && d.planta !== "PF2";
-        return d.esOB === esOB;
-      }
-      return (d.planta || "OTROS") === titulo && d.esOB === esOB;
-    });
-
-    return (
-      <div className="rounded-xl border overflow-hidden shadow-sm mb-6 bg-white">
-        <table className="w-full text-[11px]">
-          <thead>
-            <tr 
-              onClick={() => { setViewDetail({ id: titulo, esOB, isGlobal }); setSearchTerm(""); }}
-              className={`${isGlobal ? 'bg-pf-red text-white' : 'bg-[#FFFF00] text-slate-900'} font-black cursor-pointer hover:opacity-90 transition-colors group`}
-            >
-              <td className="px-3 py-2 text-xs uppercase flex items-center justify-between">
-                <span>{titulo} {esOB ? '(OB)' : '(OM)'}</span>
-                <Search size={12} className="opacity-40 group-hover:opacity-100" />
-              </td>
-              <td className="text-center w-20 border-x border-white/20 leading-tight py-1">
-                {dataset.filter(f => f.periodo === "2025").length}
-                {renderDiferencia(dataset.filter(f => f.periodo === "2025").length, datasetAnt.filter(f => f.periodo === "2025").length)}
-              </td>
-              <td className="text-center w-20 border-x border-white/20 leading-tight py-1">
-                {dataset.filter(f => f.periodo === "ENE-26").length}
-                {renderDiferencia(dataset.filter(f => f.periodo === "ENE-26").length, datasetAnt.filter(f => f.periodo === "ENE-26").length)}
-              </td>
-              <td className="text-center w-14">{dataset.filter(f => f.periodo === "S/A").length}</td>
-            </tr>
-          </thead>
-          <tbody>
-            {categorias.map(cat => (
-              <tr key={cat} onClick={() => setViewDetail({ id: titulo, esOB, cat, isGlobal })} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer group bg-white">
-                <td className="px-3 py-1.5 font-bold text-slate-500 uppercase">{cat}</td>
-                <td className="text-center">{dataset.filter(f => f.clasificacion === cat && f.periodo === "2025").length}</td>
-                <td className="text-center font-bold text-[#FF0000]">{dataset.filter(f => f.clasificacion === cat && f.periodo === "ENE-26").length}</td>
-                <td className="text-center text-slate-300">{dataset.filter(f => f.clasificacion === cat && f.periodo === "S/A").length}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
+  // --- COMPONENTES UI ---
+  const KpiCard = ({ title, count, total, icon: Icon, color, onClick }: any) => (
+    <div 
+        onClick={onClick}
+        className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm cursor-pointer hover:shadow-md transition-all group relative overflow-hidden`}
+    >
+        <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 text-${color}`}>
+            <Icon size={64} />
+        </div>
+        <div className="flex items-center gap-3 mb-2">
+            <div className={`p-2 rounded-lg bg-${color}/10 text-${color}`}>
+                <Icon size={20} />
+            </div>
+            <span className="text-xs font-bold uppercase text-slate-400">{title}</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-slate-800">{count}</span>
+            <span className="text-xs font-medium text-slate-400">
+                {Math.round((count/total)*100)}%
+            </span>
+        </div>
+        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
+            <div className={`h-full bg-${color}`} style={{ width: `${(count/total)*100}%` }}></div>
+        </div>
+    </div>
+  );
 
   return (
-    <div className="p-6 h-full relative overflow-y-auto bg-slate-50/50">
-      <div className="flex justify-between items-center mb-8 border-b border-slate-200 pb-4">
+    <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800">KPI de Atrasos</h2>
-          <p className="text-sm text-slate-400 font-medium tracking-tight">Seguimiento de cumplimiento y personal</p>
+            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestión de Backlog</h2>
+            <p className="text-slate-400 text-sm font-medium">Análisis de órdenes pendientes de cierre</p>
         </div>
-        <button onClick={handleExportarResumen} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all">
-          <Download size={18} /> Exportar Resumen Histórico
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        <div>
-          <h3 className="flex items-center gap-2 text-sm font-black text-pf-red mb-4 uppercase"><LayoutGrid size={18}/> Consolidado OM</h3>
-          {renderCuadro("COMPLEJO", data.filter(d => !d.esOB && d.planta !== "PF1" && d.planta !== "PF2"), false, true)}
-          {renderCuadro("PF ALIMENTOS", data.filter(d => !d.esOB), false, true)}
-        </div>
-        <div>
-          <h3 className="flex items-center gap-2 text-sm font-black text-pf-red mb-4 uppercase"><LayoutGrid size={18}/> Consolidado OB</h3>
-          {renderCuadro("COMPLEJO", data.filter(d => d.esOB && d.planta !== "PF1" && d.planta !== "PF2"), true, true)}
-          {renderCuadro("PF ALIMENTOS", data.filter(d => d.esOB), true, true)}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div>
-          <h3 className="text-xs font-black text-slate-400 mb-4 uppercase flex items-center gap-2"><Factory size={14}/> Plantas (OM)</h3>
-          {listaPlantas.map(p => renderCuadro(p, data.filter(d => d.planta === p && !d.esOB), false))}
-        </div>
-        <div>
-          <h3 className="text-xs font-black text-slate-400 mb-4 uppercase flex items-center gap-2"><Factory size={14}/> Plantas (OB)</h3>
-          {listaPlantas.map(p => renderCuadro(p, data.filter(d => d.planta === p && d.esOB), true))}
+        <div className="flex gap-2">
+            <select 
+                value={filtroPlanta} 
+                onChange={(e) => setFiltroPlanta(e.target.value)}
+                className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-pf-red/20"
+            >
+                <option value="TODAS">Todas las Plantas</option>
+                {matrizData.map(m => <option key={m.planta} value={m.planta}>{m.planta}</option>)}
+            </select>
+            <button onClick={exportarExcel} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-700 transition-colors">
+                <Download size={16} /> Excel
+            </button>
         </div>
       </div>
 
-      {viewDetail && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end">
-          <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            {selectedEmployee ? (
-              <EmployeeProfile 
-                employeeName={selectedEmployee}
-                orders={employeeData.orders}
-                stats={employeeData.stats}
-                filters={empFilters}
-                setFilters={setEmpFilters}
-                listaPlantas={listaPlantas}
-                onBack={() => { setSelectedEmployee(null); setEmpFilters({planta:"TODAS", periodo:"TODOS"}); }}
-              />
-            ) : (
-              <>
-                <div className="p-6 border-b bg-white">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-pf-red/10 rounded-lg"><FileText className="text-pf-red" size={20} /></div>
-                      <div>
-                        <h2 className="text-lg font-black text-slate-900 leading-none">{viewDetail.id}</h2>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{viewDetail.cat || "RESUMEN GLOBAL"}</span>
-                      </div>
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard 
+            title="Pendiente Mantenimiento" 
+            count={stats.tecnico} 
+            total={stats.total} 
+            icon={Users} 
+            color="pf-red" 
+            onClick={() => setDrillDown({ tipo: 'RESP', valor: 'TECNICO / SERVICIO' })}
+        />
+        <KpiCard 
+            title="Logística / Materiales" 
+            count={stats.materiales} 
+            total={stats.total} 
+            icon={Package} 
+            color="amber-500" 
+            onClick={() => setDrillDown({ tipo: 'RESP', valor: 'MATERIALES' })} // Ajustado para hacer match con filtro
+        />
+        <KpiCard 
+            title="Programación / Cierre" 
+            count={stats.programador} 
+            total={stats.total} 
+            icon={CalendarClock} 
+            color="blue-600" 
+            onClick={() => setDrillDown({ tipo: 'RESP', valor: 'PROGRAMADOR' })}
+        />
+        <div className="bg-slate-900 rounded-2xl p-4 text-white flex flex-col justify-between shadow-lg">
+            <div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Total Backlog</span>
+                <p className="text-4xl font-black mt-1">{stats.total}</p>
+            </div>
+            <div className="flex gap-2 mt-4">
+                <span className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">OB: {stats.prev}</span>
+                <span className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">OM: {stats.corr}</span>
+            </div>
+        </div>
+      </div>
+
+      {/* MATRIX & LIST */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        
+        {/* COLUMNA 1: MATRIZ DE CALOR */}
+        <div className="xl:col-span-1 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm h-fit">
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="font-black text-slate-700 flex items-center gap-2">
+                    <Filter size={16} /> Distribución por Planta
+                </h3>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-xs text-slate-500 uppercase font-bold">
+                        <tr>
+                            <th className="px-4 py-3">Planta</th>
+                            <th className="px-2 py-3 text-center text-pf-red">Mant.</th>
+                            <th className="px-2 py-3 text-center text-amber-600">Log.</th>
+                            <th className="px-2 py-3 text-center text-blue-600">Prog.</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {matrizData.map((row) => (
+                            <tr 
+                                key={row.planta} 
+                                onClick={() => setDrillDown({ tipo: 'PLANTA', valor: row.planta })}
+                                className="hover:bg-slate-50 cursor-pointer transition-colors group"
+                            >
+                                <td className="px-4 py-3 font-bold text-slate-700">{row.planta}</td>
+                                <td className={`px-2 py-3 text-center font-bold ${row.tecnico > 0 ? 'bg-red-50 text-pf-red' : 'text-slate-300'}`}>
+                                    {row.tecnico}
+                                </td>
+                                <td className={`px-2 py-3 text-center font-medium ${row.materiales > 0 ? 'text-amber-600' : 'text-slate-300'}`}>
+                                    {row.materiales}
+                                </td>
+                                <td className={`px-2 py-3 text-center font-medium ${row.programador > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
+                                    {row.programador}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {/* COLUMNA 2 y 3: DETALLE FILTRABLE */}
+        <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-[600px]">
+             {/* Toolbar Lista */}
+            <div className="p-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+                    <input 
+                        type="text" 
+                        placeholder="Buscar por OT o Descripción..." 
+                        value={busqueda}
+                        onChange={e => setBusqueda(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 rounded-xl border-none bg-white shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-pf-red/20 text-sm"
+                    />
+                </div>
+                {drillDown && (
+                    <button 
+                        onClick={() => setDrillDown(null)}
+                        className="flex items-center gap-1 px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-xl text-xs font-bold text-slate-600 transition-colors"
+                    >
+                        {drillDown.valor} <X size={14} />
+                    </button>
+                )}
+            </div>
+
+            {/* Lista Scrollable */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                {listaDetalle.length > 0 ? (
+                    <div className="space-y-2">
+                        {listaDetalle.map((item, idx) => (
+                            <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 hover:border-pf-red/30 hover:shadow-md transition-all group">
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.esOB ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                                            {item.esOB ? 'OB' : 'OM'}
+                                        </span>
+                                        <span className="font-mono font-bold text-slate-700">{item.ot}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 px-2 border-l border-slate-200">{item.planta}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
+                                        item.clasificacion === 'TECNICO / SERVICIO' ? 'bg-pf-red text-white' :
+                                        item.clasificacion === 'MATERIALES' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-blue-50 text-blue-700'
+                                    }`}>
+                                        {item.clasificacion}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-600 font-medium line-clamp-1 group-hover:line-clamp-none transition-all">
+                                    {item.descripcion}
+                                </p>
+                                
+                                {/* Si es culpa de técnico, mostramos quiénes faltan */}
+                                {item.clasificacion === 'TECNICO / SERVICIO' && item.detallesTecnicos && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {item.detallesTecnicos.filter(t => !t.finalizada).map((t, i) => (
+                                            <span key={i} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-pf-red rounded-md text-[10px] font-bold border border-red-100">
+                                                <FileWarning size={10} /> {t.tecnico}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                    <button onClick={() => setViewDetail(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400" /></button>
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input type="text" placeholder="Buscar OT o descripción..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-pf-red/20" />
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-                  {filteredGeneral.map((item, idx) => (
-                    <OTCard key={idx} item={item} onSelectEmployee={setSelectedEmployee} />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                        <Package size={48} className="mb-4 opacity-50"/>
+                        <p className="font-bold text-sm">No se encontraron registros</p>
+                    </div>
+                )}
+            </div>
+            
+            {/* Footer Lista */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
+                <p className="text-xs text-slate-400 font-bold">Mostrando {listaDetalle.length} registros</p>
+            </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

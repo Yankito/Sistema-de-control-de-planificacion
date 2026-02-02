@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
-  FileSpreadsheet, 
   Calendar, 
   CalendarCheck,
   RotateCcw,
@@ -10,7 +9,9 @@ import {
   ClipboardList,
   BarChart2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  Briefcase
 } from "lucide-react";
 
 export const Sidebar = ({ 
@@ -23,31 +24,89 @@ export const Sidebar = ({
   tieneFallas
 }: any) => {
 
-  // Estado para controlar si está colapsado o expandido
+  // Estado para controlar si el sidebar está colapsado
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Estado para controlar qué grupos están desplegados
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   const hayDatos = archivoCargado || tieneAtrasos || tieneSeguimiento || tieneFallas;
 
-  const menuItems = [
-    { id: 'dash', label: 'Dashboard', icon: LayoutDashboard, locked: false },
-    { id: 'maestro', label: 'Maestro Excel', icon: FileSpreadsheet, locked: !archivoCargado },
-    { id: 'plan', label: 'Planificación', icon: CalendarCheck, locked: !archivoCargado },
-    { id: 'gantt', label: 'Gantt Turnos', icon: Calendar, locked: !archivoCargado },
-    { id: 'carga', label: 'Seguimiento Técnicos', icon: ClipboardList, locked: !archivoCargado },
-    { id: 'atrasos', label: 'Atrasos/KPI', icon: Clock, locked: !tieneAtrasos },
-    { id: 'seguimiento', label: 'Seguimiento OT', icon: ClipboardList, locked: !tieneSeguimiento },
-    { id: 'fallas', label: 'Fallas Activos', icon: BarChart2, locked: !tieneFallas },
+  // Estructura del Menú Definida Jerárquicamente
+  const menuStructure = [
+    { 
+      type: 'link', 
+      id: 'dash', 
+      label: 'Dashboard', 
+      icon: LayoutDashboard, 
+      locked: false 
+    },
+    {
+      type: 'group',
+      label: 'Planificación',
+      id: 'group-plan',
+      icon: Briefcase, // Icono del grupo
+      locked: !archivoCargado,
+      children: [
+        { id: 'plan', label: 'Asignación Horaria', icon: CalendarCheck },
+        { id: 'gantt', label: 'Gantt Turnos', icon: Calendar },
+        { id: 'carga', label: 'Seguimiento Técnicos', icon: ClipboardList },
+      ]
+    },
+    { 
+      type: 'link', 
+      id: 'atrasos', 
+      label: 'Atrasos / KPI', 
+      icon: Clock, 
+      locked: !tieneAtrasos 
+    },
+    { 
+      type: 'link', 
+      id: 'seguimiento', 
+      label: 'Seguimiento OT', 
+      icon: ClipboardList, 
+      locked: !tieneSeguimiento 
+    },
+    { 
+      type: 'link', 
+      id: 'fallas', 
+      label: 'Fallas Activos', 
+      icon: BarChart2, 
+      locked: !tieneFallas 
+    },
   ];
+
+  // Efecto: Cuando cambia el activeTab, aseguramos que el grupo padre esté abierto
+  useEffect(() => {
+    menuStructure.forEach(item => {
+      if (item.type === 'group' && item.children) {
+        const hasActiveChild = item.children.some(child => child.id === activeTab);
+        if (hasActiveChild && !openGroups.includes(item.id)) {
+          setOpenGroups(prev => [...prev, item.id]);
+        }
+      }
+    });
+  }, [activeTab]);
+
+  const toggleGroup = (groupId: string) => {
+    if (isCollapsed) setIsCollapsed(false); // Si está cerrado y tocas un grupo, se abre el sidebar
+    
+    setOpenGroups(prev => 
+      prev.includes(groupId) 
+        ? prev.filter(g => g !== groupId) 
+        : [...prev, groupId]
+    );
+  };
 
   return (
     <aside 
       className={`
         bg-pf-sidebar border-r border-pf-border flex flex-col h-full shadow-sm 
-        transition-all duration-300 ease-in-out relative
+        transition-all duration-300 ease-in-out relative z-50
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
     >
-      {/* Botón de Colapsar/Desplegar (Flotante en el borde) */}
+      {/* Botón de Colapsar/Desplegar */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-9 bg-white border border-pf-border rounded-full p-1 text-slate-400 hover:text-pf-red shadow-sm z-50 transition-colors"
@@ -58,18 +117,14 @@ export const Sidebar = ({
       {/* HEADER LOGO */}
       <div className={`p-6 flex flex-col items-center transition-all duration-300 ${isCollapsed ? 'px-2' : ''}`}>
         <div className="flex flex-col items-center mb-2">
-          {/* Logo que se adapta */}
           <img 
             src="./Logo_PF_Alimentos.png" 
             alt="PF Logo" 
             className={`object-contain transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-32 mb-4'}`} 
           />
-          
-          {/* Elementos decorativos que se ocultan al colapsar */}
           <div className={`h-0.5 w-16 bg-pf-red/20 rounded-full transition-opacity duration-200 ${isCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}></div>
         </div>
         
-        {/* Texto de subtítulo */}
         <p className={`
             text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold text-center whitespace-nowrap overflow-hidden transition-all duration-300
             ${isCollapsed ? 'opacity-0 h-0' : 'opacity-100 h-auto'}
@@ -79,40 +134,109 @@ export const Sidebar = ({
       </div>
 
       {/* NAV MENU */}
-      <nav className="flex-1 px-3 space-y-1.5 overflow-x-hidden">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            disabled={item.locked}
-            title={isCollapsed ? item.label : ''} // Tooltip nativo cuando está colapsado
-            className={`
-              flex items-center w-full p-3 rounded-xl transition-all duration-200 group
-              ${isCollapsed ? 'justify-center' : 'justify-between'}
-              ${item.locked 
-                ? 'opacity-30 cursor-not-allowed grayscale' 
-                : 'hover:bg-slate-100'}
-              ${activeTab === item.id 
-                ? 'bg-pf-red text-white shadow-lg' 
-                : 'text-slate-500'}
-            `}
-          >
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-4'}`}>
-              <item.icon size={20} className={`min-w-[20px]`} />
-              
-              {/* Texto del menú */}
-              <span className={`
-                font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-300
-                ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100 ml-4'}
-              `}>
-                {item.label}
-              </span>
-            </div>
+      <nav className="flex-1 px-3 space-y-1.5 overflow-x-hidden overflow-y-auto custom-scrollbar">
+        {menuStructure.map((item: any) => {
+          
+          // RENDERIZADO DE GRUPO
+          if (item.type === 'group') {
+            const isOpen = openGroups.includes(item.id);
+            const isActiveGroup = item.children.some((c: any) => c.id === activeTab);
 
-            {/* Candado */}
-            {!isCollapsed && item.locked && <Lock size={12} className="text-slate-400 min-w-[12px]" />}
-          </button>
-        ))}
+            return (
+              <div key={item.id} className="mb-2">
+                <button
+                  onClick={() => !item.locked && toggleGroup(item.id)}
+                  disabled={item.locked}
+                  className={`
+                    flex items-center w-full p-3 rounded-xl transition-all duration-200 group relative
+                    ${isCollapsed ? 'justify-center' : 'justify-between'}
+                    ${item.locked ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-slate-100'}
+                    ${isActiveGroup && !isOpen ? 'bg-slate-50 text-pf-red' : 'text-slate-600'}
+                  `}
+                >
+                  <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-4'}`}>
+                    <item.icon size={20} className={`min-w-[20px] ${isActiveGroup ? 'text-pf-red' : ''}`} />
+                    <span className={`
+                      font-black text-sm whitespace-nowrap overflow-hidden transition-all duration-300 uppercase tracking-tight
+                      ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100 ml-4'}
+                    `}>
+                      {item.label}
+                    </span>
+                  </div>
+                  
+                  {/* Flecha e Icono Candado */}
+                  {!isCollapsed && (
+                    <div className="flex items-center">
+                       {item.locked ? (
+                         <Lock size={12} className="text-slate-400" />
+                       ) : (
+                         <ChevronDown 
+                            size={14} 
+                            className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+                         />
+                       )}
+                    </div>
+                  )}
+                </button>
+
+                {/* SUB-ITEMS (DESPLEGABLE) */}
+                <div className={`
+                    overflow-hidden transition-all duration-300 ease-in-out
+                    ${isOpen && !isCollapsed ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}
+                `}>
+                  <div className="ml-4 pl-4 border-l-2 border-slate-100 space-y-1">
+                    {item.children.map((sub: any) => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setActiveTab(sub.id)}
+                        className={`
+                          flex items-center w-full p-2.5 rounded-lg transition-all duration-200 text-xs font-medium
+                          ${activeTab === sub.id 
+                            ? 'bg-pf-red text-white shadow-md translate-x-1' 
+                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}
+                        `}
+                      >
+                         <sub.icon size={16} className="mr-3 min-w-[16px]" />
+                         <span>{sub.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // RENDERIZADO DE LINK SIMPLE
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              disabled={item.locked}
+              title={isCollapsed ? item.label : ''}
+              className={`
+                flex items-center w-full p-3 rounded-xl transition-all duration-200 group
+                ${isCollapsed ? 'justify-center' : 'justify-between'}
+                ${item.locked 
+                  ? 'opacity-30 cursor-not-allowed grayscale' 
+                  : 'hover:bg-slate-100'}
+                ${activeTab === item.id 
+                  ? 'bg-slate-800 text-white shadow-lg' 
+                  : 'text-slate-500'}
+              `}
+            >
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-4'}`}>
+                <item.icon size={20} className={`min-w-[20px]`} />
+                <span className={`
+                  font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-300
+                  ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100 ml-4'}
+                `}>
+                  {item.label}
+                </span>
+              </div>
+              {!isCollapsed && item.locked && <Lock size={12} className="text-slate-400 min-w-[12px]" />}
+            </button>
+          );
+        })}
 
         {/* Separador y Botón de Limpiar */}
         {hayDatos && (

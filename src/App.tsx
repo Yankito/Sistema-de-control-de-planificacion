@@ -5,14 +5,12 @@ import * as XLSX from "xlsx";
 import { 
   processExcelData, 
   obtenerHorariosPorPlanta, 
-  normalizarColumnas, 
   obtenerMapaHorarios  
 } from "./logic/excelProcessor";
 import { PlannerService } from "./logic/PlannerService";
 import { PlanResult, HorarioTecnico } from "./types";
-import { FileUploader } from "./components/FileUploader";
+import { FileUploader, FileType } from "./components/FileUploader";
 import { DashboardView } from "./views/DashboardView";
-import { MaestroView } from "./views/MaestroView";
 import { HorariosView } from "./views/HorariosView";
 import { PlanificacionView } from "./views/PlanificacionView";
 import { processSeguimientoOTs } from "./logic/seguimientoOTsProcessor";
@@ -32,7 +30,6 @@ import { FallaRow } from "./types"; // Asegúrate de importar esto
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");
-  const [datosCrudos, setDatosCrudos] = useState<any[]>([]);
   const [planResult, setPlanResult] = useState<PlanResult[]>([]);
   const [planResultSinAsignar, setPlanResultSinAsignar] = useState<any[]>([]);
   const [horariosResult, setHorariosResult] = useState<HorarioTecnico[]>([]);
@@ -44,7 +41,6 @@ function App() {
   const [atrasosAnterior, setAtrasosAnterior] = useState<AtrasoRow[]>([]);
   const [cargandoPlan, setCargandoPlan] = useState(false);
   const [cargandoAtrasos, setCargandoAtrasos] = useState(false);
-  const [plantaMaestro, setPlantaMaestro] = useState("PF3");
   const [plantaHorarios, setPlantaHorarios] = useState("PF3");
   const [plantaPlan, setPlantaPlan] = useState("PF3");
   const [seguimientoResult, setSeguimientoResult] = useState<SeguimientoResult>({ mantencion: [], infraestructura: [] });
@@ -58,6 +54,24 @@ function App() {
 
   const [fallasResult, setFallasResult] = useState<FallaRow[]>([]);
   const [cargandoFallas, setCargandoFallas] = useState(false);
+
+  const [highlightedModule, setHighlightedModule] = useState<FileType | null>(null);
+
+  // NUEVA FUNCIÓN: Maneja la solicitud de subida
+  const handleRequestUpload = (tipo: FileType) => {
+    setHighlightedModule(tipo);
+    
+    // Scrollear hacia arriba para que el usuario vea el uploader
+    const uploaderElement = document.getElementById("uploader-section");
+    if (uploaderElement) {
+        uploaderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Quitar el resaltado después de 2 segundos
+    setTimeout(() => {
+      setHighlightedModule(null);
+    }, 2000);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'PLAN' | 'ATRASOS' | 'ANTERIOR' | 'SEGUIMIENTO' | 'FALLAS') => {
     const file = e.target.files?.[0];
@@ -77,8 +91,6 @@ function App() {
 
           if (tipo === 'PLAN') {
             setWorkbookActual(workbook);
-            const rawAct = XLSX.utils.sheet_to_json(workbook.Sheets["B.ACT"]);
-            setDatosCrudos(normalizarColumnas(rawAct));
             setHorariosResult(obtenerHorariosPorPlanta(workbook, plantaHorarios));
             setArchivoCargado(true);
             setPlanResult([]);
@@ -132,20 +144,48 @@ function App() {
     }
   };
 
-  // --- EJECUCIÓN DE PLANIFICACIÓN (AHORA CON MODO) ---
+  // --- EJECUCIÓN DE PLANIFICACIÓN (CONECTADA AL DASHBOARD) ---
   const ejecutarPlanificacion = (modo: 'STRICT' | 'BALANCED') => {
     if (workbookActual) {
-      // NOTA: Debes actualizar processExcelData para que acepte el 'modo' y llame al servicio correcto
-      // @ts-ignore (Ignoramos TS hasta que actualices excelProcessor)
-      const { resultados, sinAsignar, empleadosMap: mapaCargado } = processExcelData(workbookActual.Sheets, modo);
-      const horarios = obtenerMapaHorarios(workbookActual.Sheets);
-      
-      setPlanResult(resultados);
-      setPlanResultSinAsignar(sinAsignar);
-      setEmpleadosMap(mapaCargado);
-      setMapaHorariosActual(horarios);
-      
-      // Convertir mapa a array para el modal
+      // 1. Activar estado de carga para feedback visual (opcional)
+      setCargandoPlan(true);
+
+      // 2. Usamos setTimeout para que React pueda renderizar el estado de "Cargando..."
+      // antes de que el cálculo pesado congele momentáneamente el navegador.
+      setTimeout(() => {
+        try {
+          console.log(`Ejecutando algoritmo: ${modo}`);
+
+          // 3. Llamamos al procesador pasando el MODO seleccionado
+          const { resultados, sinAsignar, empleadosMap: mapaCargado } = processExcelData(
+            workbookActual.Sheets, 
+            modo 
+          );
+          
+          const horarios = obtenerMapaHorarios(workbookActual.Sheets);
+          
+          // 4. Actualizamos todos los estados con la nueva data calculada
+          setPlanResult(resultados);
+          setPlanResultSinAsignar(sinAsignar);
+          setEmpleadosMap(mapaCargado);
+          setMapaHorariosActual(horarios);
+          
+          // 5. Navegación Automática: Llevamos al usuario a la vista de resultados
+          setActiveTab("plan");
+          
+          // Opcional: Mostrar un toast o alerta de éxito
+          // alert(`Planificación ${modo === 'STRICT' ? 'Estricta' : 'Balanceada'} generada con éxito.`);
+
+        } catch (error) {
+          console.error("Error crítico en planificación:", error);
+          alert("Ocurrió un error al procesar los datos. Revisa la consola.");
+        } finally {
+          // 6. Desactivar carga
+          setCargandoPlan(false);
+        }
+      }, 100);
+    } else {
+      alert("Por favor carga el archivo Maestro Plan primero.");
     }
   };
 
@@ -273,10 +313,13 @@ function App() {
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <section className="flex-1 p-10 overflow-y-auto">
+          
           {activeTab === "dash" && (
             <div className="space-y-10">
               <div className="bg-white p-8 rounded-3xl border border-pf-border shadow-sm">
                 <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter">Gestión de Datos</h2>
+                
+                {/* Pasamos la prop de resaltado al Uploader */}
                 <FileUploader 
                   onFileUpload={handleFileUpload} 
                   isLoading={cargandoPlan || cargandoAtrasos || cargandoSeguimiento || cargandoFallas}
@@ -287,27 +330,24 @@ function App() {
                     seguimiento: seguimientoResult.mantencion.length > 0,
                     fallas: fallasResult.length > 0
                   }}
+                  highlightedModule={highlightedModule} // <--- AQUÍ
                 />
               </div>
-              {archivoCargado && (
-                <DashboardView 
-                  planResult={planResult} 
-                  onEjecutarPlan={ejecutarPlanificacion} 
-                />
-              )}
+
+              {/* MUESTRA EL DASHBOARD SIEMPRE (Quitamos la condición {archivoCargado && ...}) */}
+              <DashboardView 
+                planResult={planResult} 
+                onEjecutarPlan={ejecutarPlanificacion}
+                atrasosResult={atrasosResult}
+                fallasResult={fallasResult}
+                setActiveTab={setActiveTab}
+                archivoCargado={archivoCargado}
+                onRequestUpload={handleRequestUpload} // <--- AQUÍ
+              />
             </div>
           )}
           {archivoCargado && (
             <>
-              {activeTab === "maestro" && (
-                <MaestroView 
-                  datosCrudos={datosCrudos.filter(orden => {
-                    const deptoKey = Object.keys(orden).find(k => k.includes("DEPARTAMENTO")) || "";
-                    return PlannerService.mapDepartamentoAPlanta(orden[deptoKey]) === plantaMaestro;
-                  })}
-                  plantas={plantas} plantaSeleccionada={plantaMaestro} onCambiarPlanta={setPlantaMaestro} 
-                />
-              )}
               {activeTab === "plan" && (
                 <PlanificacionView 
                   planResult={planResult.filter(p => p.planta === plantaPlan)}
@@ -322,7 +362,6 @@ function App() {
                   onCambiarPlanta={setPlantaPlan}
                   empleadosMap={empleadosMap}
                   mapaHorarios={mapaHorariosActual}
-                  // Pasamos la función para abrir el modal
                   onEditTecnicos={(orden: any) => {
                       setOrdenEditando(orden);
                       setModalTecnicoOpen(true);

@@ -51,7 +51,7 @@ const extraerCC = (texto: string): string => {
 export const processSeguimiento = (sheets: { [key: string]: XLSX.WorkSheet }): SeguimientoResult => {
   
   // 1. Verificación de hojas
-  const hojas = ["STGO", "PF1", "PF2", "CI", "ACTIVOS", "CUMPLIMIENTO"];
+  const hojas = ["STGO", "PF1", "PF2", "MP3", "ACTIVOS", "CUMPLIMIENTO"];
   const faltantes = hojas.filter(h => !sheets[h]);
   
   if (faltantes.length > 0) {
@@ -69,7 +69,7 @@ export const processSeguimiento = (sheets: { [key: string]: XLSX.WorkSheet }): S
   const dfStgo = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["STGO"], opts));
   const dfPf1 = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["PF1"], opts));
   const dfPf2 = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["PF2"], opts));
-  const dfCi = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["CI"], opts));
+  const dfCi = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["MP3"], opts));
   const dfActivos = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["ACTIVOS"], opts));
   const dfCumplimiento = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["CUMPLIMIENTO"], opts));
 
