@@ -1,5 +1,5 @@
 import { Search, TrendingUp, TrendingDown, Minus, CheckCircle } from "lucide-react";
-import { AtrasoRow } from "../../logic/atrasosProcessor";
+import { AtrasoRow } from "../../logic/seguimientoOTsProcessor";
 
 interface ResumenProps {
   titulo: string;
