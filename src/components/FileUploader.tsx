@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  Download
+  Download,
+  CalendarDays
 } from "lucide-react";
 import { useState, useRef } from "react";
 // IMPORTAMOS TODAS LAS FUNCIONES NUEVAS
@@ -31,9 +32,11 @@ interface FileUploaderProps {
     fallas: boolean;
   };
   highlightedModule: FileType | null;
+  targetWeek: string;
+  weekOptions: { label: string, value: string }[];
+  setTargetWeek: (w: string) => void;
 }
 
-// Configuración simple para los que no tienen plantilla compleja definida aún
 const SIMPLE_TEMPLATES: Record<string, string[]> = {
   ANTERIOR: ["Orden", "Texto breve", "Ubicac.técnica", "Fecha in.extr."],
   SEGUIMIENTO: ["Orden", "Estado", "Texto breve", "Ubicac.técnica"]
@@ -86,22 +89,13 @@ const UploadCard = ({
     if (!isLoading) inputRef.current?.click();
   };
 
-  // --- LOGICA DE DESCARGA CONECTADA ---
   const handleDownloadClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita que se abra el input file
-    
+    e.stopPropagation(); 
     switch (type) {
-      case 'PLAN':
-        descargarPlantillaPlan();
-        break;
-      case 'FALLAS':
-        descargarPlantillaFallas();
-        break;
-      case 'ATRASOS':
-        descargarPlantillaAtrasos();
-        break;
+      case 'PLAN': descargarPlantillaPlan(); break;
+      case 'FALLAS': descargarPlantillaFallas(); break;
+      case 'ATRASOS': descargarPlantillaAtrasos(); break;
       default:
-        // Para ANTERIOR y SEGUIMIENTO usamos la simple por ahora
         const cols = SIMPLE_TEMPLATES[type] || ["Columna1"];
         descargarPlantillaSimple(type, cols);
         break;
@@ -180,7 +174,9 @@ const UploadCard = ({
 };
 
 // --- COMPONENTE PRINCIPAL ---
-export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModule }: FileUploaderProps) => {
+export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModule, targetWeek, weekOptions, setTargetWeek }: FileUploaderProps) => {
+  
+  // Configuración de tarjetas
   const cardsConfig = [
     { type: 'PLAN' as FileType, label: 'Maestro Plan', sublabel: 'Arrastra "B.ACT.xlsx" aquí', icon: FileSpreadsheet, color: 'text-pf-red', bg: 'bg-pf-red', active: status.plan },
     { type: 'ATRASOS' as FileType, label: 'Reporte Actual', sublabel: 'Arrastra "KPI Cumplimiento"', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-600', active: status.atrasos },
@@ -191,11 +187,35 @@ export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModul
 
   return (
     <div className="relative scroll-mt-10" id="uploader-section">
+      {/* HEADER DEL UPLOADER CON SELECTOR DE SEMANA */}
+      <div className="flex justify-between items-end mb-6">
+          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Zona de Carga</h3>
+          
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+              <CalendarDays className="text-blue-600" size={18} />
+              <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Asignar reporte a semana:</span>
+                  <select 
+                      value={targetWeek}
+                      onChange={(e) => setTargetWeek(e.target.value)}
+                      className="text-sm font-black text-slate-700 bg-transparent outline-none cursor-pointer min-w-[200px]"
+                  >
+                      {/* CORRECCIÓN VISUAL AQUÍ: Agregamos clases bg-white y text-slate-800 */}
+                      {weekOptions.map(opt => (
+                          <option key={opt.value} value={opt.value} className="bg-white text-slate-800 font-bold">
+                            {opt.label}
+                          </option>
+                      ))}
+                  </select>
+              </div>
+          </div>
+      </div>
+
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center animate-in fade-in duration-300">
           <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center border border-slate-100">
             <Loader2 className="text-pf-red animate-spin mb-3" size={40} />
-            <p className="font-black text-slate-800 uppercase tracking-widest text-xs">Procesando Excel...</p>
+            <p className="font-black text-slate-800 uppercase tracking-widest text-xs">Procesando y Guardando...</p>
           </div>
         </div>
       )}

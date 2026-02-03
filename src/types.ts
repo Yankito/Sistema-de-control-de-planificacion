@@ -14,6 +14,7 @@ export interface PlanResult {
   fechaAnterior: string;
   error?: string;
 }
+
 export interface HorarioTecnico {
   nombre: string;
   rol: string;
@@ -46,10 +47,57 @@ export interface FallaRow {
   estadoPedido: string;
   tipoPedido: string;
   tecnico: string;
-  duracionMinutos: number; // Duración Paro Oracle [min]
-  gasto: number; // Gasto OM [$]
-  perdidaKg: number; // Pérdida por Paro [kg]
+  duracionMinutos: number; 
+  gasto: number; 
+  perdidaKg: number; 
   anio: number;
   mes: number;
   descripcionOperador: string;
+}
+
+export interface TecnicoEstado {
+  tecnico: string;
+  finalizada: boolean;
+}
+
+export interface AtrasoRow {
+  planta: string;
+  ot: string;
+  descripcion: string;
+  estado: string;
+  clasificacion: "CUMPLIDA" | "TECNICO / SERVICIO" | "PROGRAMADOR" | "OC / OTRO";
+  periodo: string;
+  semana: string; 
+  esOB: boolean;
+  detallesTecnicos?: TecnicoEstado[];
+  rmd?: string;
+  rse?: string;
+}
+
+export interface ActivoRow {
+  codigo: string;
+  descripcion: string;
+  planta: string;
+  ubicacion: string;
+}
+
+export interface MasivoRow {
+  numero_ot: string;
+  activo: string;
+  descripcion: string;
+  tpt: string;
+  fecha_progr: string;
+  horas: number;
+  rmd: string;
+  rse: string;
+}
+
+export interface CumplimientoRow {
+  planta: string;
+  empleado: string;
+  nro_ot: string;
+  tipo: string;
+  estado_om: string; // El dato clave
+  fecha_programada: string;
+  op_finalizada: string;
 }

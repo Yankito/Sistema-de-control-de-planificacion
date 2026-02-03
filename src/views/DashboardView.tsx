@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { PlanResult, FallaRow } from "../types"; 
-import { AtrasoRow } from "../logic/seguimientoOTsProcessor";
+import { PlanResult, FallaRow, AtrasoRow } from "../types"; 
 import { FileType } from "../components/FileUploader"; // Importamos el tipo
 import { 
   PlayCircle, Scale, CalendarCheck, Clock, AlertTriangle, ArrowRight, Activity, BarChart2, TrendingUp, LucideIcon

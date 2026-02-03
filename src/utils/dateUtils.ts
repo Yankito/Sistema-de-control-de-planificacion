@@ -1,38 +1,94 @@
 // src/utils/dateUtils.ts
 
-export const getRangoSemana = (semana: number, anio: number) => {
-  // 1. Creamos una fecha para el 1 de Enero del año solicitado
-  const primerDiaAnio = new Date(anio, 0, 1);
-  
-  // 2. Obtenemos el día de la semana (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
-  const diaSemana = primerDiaAnio.getDay();
+// ==========================================
+// 1. UTILIDADES DE FORMATO (EXISTENTES)
+// ==========================================
+export const clp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
+export const num = (v: number) => new Intl.NumberFormat('es-CL').format(v);
+export const fechaFmt = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
 
-  // 3. Ajustamos para encontrar el LUNES de esa primera semana.
-  // En JS, el Domingo es 0. Nosotros queremos que Lunes sea el "inicio" (índice 0 relativo).
-  // Si es Domingo (0), hay que retroceder 6 días para llegar al lunes anterior.
-  // Si es Lunes (1), retrocedemos 0 días.
-  // Si es Martes (2), retrocedemos 1 día, etc.
+// ==========================================
+// 2. NUEVA LÓGICA DE SEMANAS (SISTEMA ISO)
+// ==========================================
+
+export const getWeekID = (date: Date): string => {
+  const d = new Date(date.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - dayNr + 3);
+  const firstThursday = d.valueOf();
+  d.setMonth(0, 1);
+  if (d.getDay() !== 4) {
+      d.setMonth(0, 1 + ((4 - d.getDay()) + 7) % 7);
+  }
+  const weekNumber = 1 + Math.ceil((firstThursday - d.valueOf()) / 604800000);
+  const targetYear = d.getFullYear(); 
+  
+  return `${targetYear}-S${weekNumber.toString().padStart(2, '0')}`;
+};
+
+/**
+ * Devuelve la descripción visual: "(26 Ene - 01 Feb)"
+ */
+export const getWeekRange = (date: Date): string => {
+  const lunes = new Date(date.valueOf());
+  const diaSemana = (lunes.getDay() + 6) % 7; 
+  lunes.setDate(lunes.getDate() - diaSemana); 
+
+  const domingo = new Date(lunes.valueOf());
+  domingo.setDate(lunes.getDate() + 6);
+
+  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const f = (dt: Date) => `${dt.getDate()} ${meses[dt.getMonth()]}`;
+
+  return `(${f(lunes)} - ${f(domingo)})`;
+};
+
+export const getWeekOptions = () => {
+    const options: Array<{ label: string; value: string }> = [];
+    const today = new Date();
+    
+    // Semana Anterior
+    const addOpt = (d: Date, prefix: string = "") => {
+        const id = getWeekID(d);        // Valor: "2026-S05"
+        const range = getWeekRange(d);  // Visual: "(...)"
+        const label = prefix ? `${prefix}: ${id} ${range}` : `${id} ${range}`;
+        options.push({ label, value: id });
+    };
+
+    // Generar opciones
+    const lastWeek = new Date(today); lastWeek.setDate(today.getDate() - 7);
+    addOpt(lastWeek, "Anterior");
+
+    addOpt(today, "Actual");
+
+    const twoWeeksAgo = new Date(today); twoWeeksAgo.setDate(today.getDate() - 14);
+    addOpt(twoWeeksAgo);
+
+    const threeWeeksAgo = new Date(today); threeWeeksAgo.setDate(today.getDate() - 21);
+    addOpt(threeWeeksAgo);
+
+    return { options, default: getWeekID(lastWeek) };
+};
+// ==========================================
+// 3. COMPATIBILIDAD (LEGACY)
+// ==========================================
+// Mantenemos tu función original por si se usa en otra parte del sistema,
+// aunque para los reportes nuevos recomendamos usar getWeekLabel.
+export const getRangoSemana = (semana: number, anio: number) => {
+  const primerDiaAnio = new Date(anio, 0, 1);
+  const diaSemana = primerDiaAnio.getDay();
   const diasParaRetroceder = diaSemana === 0 ? 6 : diaSemana - 1;
 
-  // Calculamos la fecha del Lunes de la Semana 1
   const inicioSemana1 = new Date(primerDiaAnio);
   inicioSemana1.setDate(primerDiaAnio.getDate() - diasParaRetroceder);
 
-  // 4. Calculamos el inicio de la semana solicitada
-  // Sumamos 7 días por cada semana que ha pasado después de la primera
   const inicioSemanaTarget = new Date(inicioSemana1);
   inicioSemanaTarget.setDate(inicioSemana1.getDate() + ((semana - 1) * 7));
 
-  // 5. Calculamos el fin de la semana (El inicio + 6 días = Domingo)
   const finSemanaTarget = new Date(inicioSemanaTarget);
   finSemanaTarget.setDate(inicioSemanaTarget.getDate() + 6);
 
-  // Formateador simple
   const fmt = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
   
   return `${fmt(inicioSemanaTarget)} - ${fmt(finSemanaTarget)}`;
 };
-
-export const clp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
-export const num = (v: number) => new Intl.NumberFormat('es-CL').format(v);
-export const fechaFmt = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });

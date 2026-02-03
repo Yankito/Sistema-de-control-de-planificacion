@@ -1,5 +1,6 @@
 import { Search, TrendingUp, TrendingDown, Minus, CheckCircle } from "lucide-react";
-import { AtrasoRow } from "../../logic/seguimientoOTsProcessor";
+import { AtrasoRow } from "../../types";
+import { useMemo } from "react";
 
 interface ResumenProps {
   titulo: string;
@@ -8,20 +9,47 @@ interface ResumenProps {
   esOB: boolean;
   modoVista: "ATRASOS" | "CUMPLIDAS";
   isGlobal?: boolean;
+  showComparison?: boolean; // NUEVA PROP
   onDetail: (cat?: string) => void;
 }
 
-export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isGlobal, onDetail }: ResumenProps) => {
+export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isGlobal, showComparison = false, onDetail }: ResumenProps) => {
   const categorias = ["TECNICO / SERVICIO", "PROGRAMADOR", "OC / OTRO"];
 
+  const sortPeriods = (a: string, b: string) => {
+      if (a === "S/A") return 1;
+      if (b === "S/A") return -1;
+      if (a === "2025") return -1; 
+      if (b === "2025") return 1;
+      const meses: Record<string, number> = { "ENE": 0, "FEB": 1, "MAR": 2, "ABR": 3, "MAY": 4, "JUN": 5, "JUL": 6, "AGO": 7, "SEP": 8, "OCT": 9, "NOV": 10, "DIC": 11 };
+      const [mesA, anioA] = a.split('-');
+      const [mesB, anioB] = b.split('-');
+      if (!anioA || !anioB) return a.localeCompare(b);
+      if (anioA !== anioB) return parseInt(anioA) - parseInt(anioB);
+      return meses[mesA] - meses[mesB];
+  };
+
+  const columnasPeriodo = useMemo(() => {
+      const setPeriodos = new Set<string>();
+      // Solo tomamos columnas del dataset actual para no mostrar columnas vacías si el anterior tenía otros años
+      dataset.forEach(d => {
+          if (d.periodo && d.periodo !== "S/A") setPeriodos.add(d.periodo);
+      });
+      // Si hay comparación, agregamos también las columnas del anterior por si acaso (opcional)
+      if (showComparison) {
+          datasetAnt.forEach(d => { if(d.periodo && d.periodo !== "S/A") setPeriodos.add(d.periodo); });
+      }
+      return Array.from(setPeriodos).sort(sortPeriods);
+  }, [dataset, datasetAnt, showComparison]);
+
   const renderDiff = (actual: number, anterior: number) => {
-    if (!datasetAnt || datasetAnt.length === 0) return null;
+    // CORRECCIÓN: Si showComparison es false, no renderizamos nada
+    if (!showComparison || !datasetAnt) return null;
+    
     const diff = actual - anterior;
     if (diff === 0) return <span className="text-slate-400 ml-1"><Minus size={10} /></span>;
-
     const mejoro = modoVista === "CUMPLIDAS" ? diff > 0 : diff < 0;
     const color = mejoro ? "text-green-600" : "text-red-600";
-
     return (
       <span className={`flex items-center gap-0.5 font-black text-[10px] ml-1 ${color}`}>
         {diff > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />} {Math.abs(diff)}
@@ -47,70 +75,54 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
               <span className="flex items-center gap-2">{modoVista === 'CUMPLIDAS' && <CheckCircle size={12}/>} {titulo} {esOB ? '(OB)' : '(OM)'}</span>
               <Search size={12} className="opacity-20 group-hover:opacity-100" />
             </td>
-            <td className="w-24 py-1">
-              <div className="flex items-center justify-center">
-                2025 {renderDiff(getCount(dataset, "2025"), getCount(datasetAnt, "2025"))}
-              </div>
-            </td>
-            <td className="w-24 py-1">
-              <div className="flex items-center justify-center">
-                ENE-26 {renderDiff(getCount(dataset, "ENE-26"), getCount(datasetAnt, "ENE-26"))}
-              </div>
-            </td>
-            <td className="text-center w-14">S/A</td>
+            {columnasPeriodo.map(p => (
+                <td key={p} className="w-24 py-1 text-center border-l border-white/10">
+                    <div className="flex items-center justify-center">
+                        {p}
+                    </div>
+                </td>
+            ))}
+            <td className="text-center w-14 border-l border-white/10">S/A</td>
           </tr>
         </thead>
         <tbody>
           {modoVista === "ATRASOS" ? (
             <>
-              {/* FILA DE TOTAL ATRASOS */}
               <tr onClick={() => onDetail()} className="border-b border-slate-100 bg-slate-50/30 hover:bg-slate-50 cursor-pointer font-black text-slate-900">
                 <td className="px-3 py-2 uppercase text-left">TOTAL ATRASOS</td>
-                <td>
-                  <div className="flex items-center justify-center">
-                    {getCount(dataset, "2025")} {renderDiff(getCount(dataset, "2025"), getCount(datasetAnt, "2025"))}
-                  </div>
-                </td>
-                <td>
-                  <div className="flex items-center justify-center">
-                    {getCount(dataset, "ENE-26")} {renderDiff(getCount(dataset, "ENE-26"), getCount(datasetAnt, "ENE-26"))}
-                  </div>
-                </td>
+                {columnasPeriodo.map(p => (
+                    <td key={p} className="text-center">
+                        <div className="flex items-center justify-center">
+                            {getCount(dataset, p)} {renderDiff(getCount(dataset, p), getCount(datasetAnt, p))}
+                        </div>
+                    </td>
+                ))}
                 <td className="text-center text-slate-400">{getCount(dataset, "S/A")}</td>
               </tr>
-              
-              {/* FILAS DE CATEGORÍAS */}
               {categorias.map(cat => (
                 <tr key={cat} onClick={() => onDetail(cat)} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer text-slate-600">
                   <td className="px-3 py-1.5 font-bold uppercase text-left pl-6 text-[10px]">{cat}</td>
-                  <td>
-                    <div className="flex items-center justify-center">
-                      {getCount(dataset, "2025", cat)} {renderDiff(getCount(dataset, "2025", cat), getCount(datasetAnt, "2025", cat))}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center justify-center font-bold">
-                      {getCount(dataset, "ENE-26", cat)} {renderDiff(getCount(dataset, "ENE-26", cat), getCount(datasetAnt, "ENE-26", cat))}
-                    </div>
-                  </td>
+                  {columnasPeriodo.map(p => (
+                    <td key={p} className="text-center">
+                        <div className="flex items-center justify-center">
+                            {getCount(dataset, p, cat)} {renderDiff(getCount(dataset, p, cat), getCount(datasetAnt, p, cat))}
+                        </div>
+                    </td>
+                  ))}
                   <td className="text-center text-slate-300">{getCount(dataset, "S/A", cat)}</td>
                 </tr>
               ))}
             </>
           ) : (
-            /* MODO CUMPLIDAS */
             <tr onClick={() => onDetail()} className="hover:bg-green-50/50 cursor-pointer font-bold text-green-700">
               <td className="px-3 py-3 uppercase text-left">TOTAL FINALIZADAS</td>
-              <td>
-                <div className="flex items-center justify-center text-lg">
-                  {getCount(dataset, "2025")} {renderDiff(getCount(dataset, "2025"), getCount(datasetAnt, "2025"))}
-                </div>
-              </td>
-              <td>
-                <div className="flex items-center justify-center text-lg">
-                  {getCount(dataset, "ENE-26")} {renderDiff(getCount(dataset, "ENE-26"), getCount(datasetAnt, "ENE-26"))}
-                </div>
-              </td>
+              {columnasPeriodo.map(p => (
+                <td key={p} className="text-center">
+                    <div className="flex items-center justify-center text-lg">
+                        {getCount(dataset, p)} {renderDiff(getCount(dataset, p), getCount(datasetAnt, p))}
+                    </div>
+                </td>
+              ))}
               <td className="text-center text-slate-300">{getCount(dataset, "S/A")}</td>
             </tr>
           )}
