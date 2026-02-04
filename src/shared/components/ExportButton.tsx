@@ -10,9 +10,10 @@ interface ExportButtonProps {
   plantaSeleccionada: string;
   rangoTexto: string;
   semana: string;
+  reportTitle: string;
 }
 
-export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTexto, semana }: ExportButtonProps) => {
+export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTexto, semana, reportTitle }: ExportButtonProps) => {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {
@@ -64,7 +65,7 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
 
       headerReport.innerHTML = `
         <div>
-          <h1 style="font-size: 28px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase;">Reporte de Activos</h1>
+          <h1 style="font-size: 28px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase;">${reportTitle}</h1>
           
           <div style="display: flex; gap: 30px; margin-top: 15px;">
             <div>
@@ -79,7 +80,7 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
           </div>
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 22px; font-weight: 900; color: #0f172a;">PF ALIMENTOS</span></div>
+          <div style="font-size: 22px; font-weight: 900; color: #0f172a;">PF ALIMENTOS</div>
           <p style="font-size: 11px; color: #94a3b8; margin: 0;">Generado: ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
         </div>  
       `;

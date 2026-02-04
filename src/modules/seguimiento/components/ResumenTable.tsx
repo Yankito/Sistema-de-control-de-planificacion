@@ -9,7 +9,7 @@ interface ResumenProps {
   esOB: boolean;
   modoVista: "ATRASOS" | "CUMPLIDAS";
   isGlobal?: boolean;
-  showComparison?: boolean; // NUEVA PROP
+  showComparison?: boolean;
   onDetail: (cat?: string) => void;
 }
 
@@ -17,8 +17,7 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
   const categorias = ["TECNICO / SERVICIO", "PROGRAMADOR", "OC / OTRO"];
 
   const sortPeriods = (a: string, b: string) => {
-      if (a === "S/A") return 1;
-      if (b === "S/A") return -1;
+      // Ya no necesitamos la lógica de S/A aquí
       if (a === "2025") return -1; 
       if (b === "2025") return 1;
       const meses: Record<string, number> = { "ENE": 0, "FEB": 1, "MAR": 2, "ABR": 3, "MAY": 4, "JUN": 5, "JUL": 6, "AGO": 7, "SEP": 8, "OCT": 9, "NOV": 10, "DIC": 11 };
@@ -31,11 +30,9 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
 
   const columnasPeriodo = useMemo(() => {
       const setPeriodos = new Set<string>();
-      // Solo tomamos columnas del dataset actual para no mostrar columnas vacías si el anterior tenía otros años
       dataset.forEach(d => {
           if (d.periodo && d.periodo !== "S/A") setPeriodos.add(d.periodo);
       });
-      // Si hay comparación, agregamos también las columnas del anterior por si acaso (opcional)
       if (showComparison) {
           datasetAnt.forEach(d => { if(d.periodo && d.periodo !== "S/A") setPeriodos.add(d.periodo); });
       }
@@ -43,7 +40,6 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
   }, [dataset, datasetAnt, showComparison]);
 
   const renderDiff = (actual: number, anterior: number) => {
-    // CORRECCIÓN: Si showComparison es false, no renderizamos nada
     if (!showComparison || !datasetAnt) return null;
     
     const diff = actual - anterior;
@@ -82,7 +78,6 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
                     </div>
                 </td>
             ))}
-            <td className="text-center w-14 border-l border-white/10">S/A</td>
           </tr>
         </thead>
         <tbody>
@@ -97,7 +92,6 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
                         </div>
                     </td>
                 ))}
-                <td className="text-center text-slate-400">{getCount(dataset, "S/A")}</td>
               </tr>
               {categorias.map(cat => (
                 <tr key={cat} onClick={() => onDetail(cat)} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer text-slate-600">
@@ -109,7 +103,6 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
                         </div>
                     </td>
                   ))}
-                  <td className="text-center text-slate-300">{getCount(dataset, "S/A", cat)}</td>
                 </tr>
               ))}
             </>
@@ -123,7 +116,6 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
                     </div>
                 </td>
               ))}
-              <td className="text-center text-slate-300">{getCount(dataset, "S/A")}</td>
             </tr>
           )}
         </tbody>

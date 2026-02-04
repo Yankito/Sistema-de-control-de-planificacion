@@ -4,7 +4,8 @@ import { BarChart3, PieChart, Factory } from "lucide-react"; // Añade PieChart 
 import { ResumenTable } from "../components/ResumenTable";
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { DatabaseService } from "../../../shared/db/DatabaseService";
-import { exportarAtrasosFiltrados, exportarReporteCompleto } from "../utils/exportUtils";
+import { exportarReporteCompleto } from "../utils/exportUtils";
+import { ExportButton } from "../../../shared/components/ExportButton";
 
 // COMPONENTES
 import { SeguimientoHeader } from "../components/SeguimientoHeader";
@@ -64,7 +65,7 @@ export const SeguimientoOTsView = ({
 
     // Constantes de Plantas
     const PLANTAS_COMPLEJO = useMemo(() => ["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "DC", "VENTAS"], []);
-    const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
+    const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", "MPS", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
     const LISTA_PLANTAS_INDIVIDUALES = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS", "DC", "VENTAS"], []);
     const LISTA_CUMPLIMIENTO = useMemo(() => LISTA_PLANTAS_INDIVIDUALES, [LISTA_PLANTAS_INDIVIDUALES]);
 
@@ -118,10 +119,6 @@ export const SeguimientoOTsView = ({
         }
     };
 
-    const handleExportarExcel = async () => {
-        await exportarAtrasosFiltrados(dataFiltrada, modoVista, selectedSemana);
-    };
-
     const handleExportarExcelCompleto = async () => {
         await exportarReporteCompleto(dataActual, localDataAnterior, modoVista, reporteActual);
     };
@@ -137,6 +134,14 @@ export const SeguimientoOTsView = ({
             {isLoading && <LoadingOverlay message="Procesando datos y comparativas..." />}
 
             <div className="flex justify-end mb-4">
+                <ExportButton 
+                    elementId="dashboard-atrasos-container"
+                    fileName={`Seguimiento_${modoVista}_${reporteActual}`}
+                    plantaSeleccionada="PF ALIMENTOS (CONSOLIDADO)"
+                    rangoTexto={reporteActual} // Ej: 2026-S05
+                    semana={reporteActual.split('-')[1] || reporteActual}
+                    reportTitle={modoVista === "ATRASOS" ? "Tablero de Atrasos" : "Tablero de Cumplimiento"}
+                />
                 <button 
                     onClick={() => setShowAnalysis(true)}
                     disabled={isLoading}
@@ -154,10 +159,12 @@ export const SeguimientoOTsView = ({
                 selectedYear={selectedYear} setSelectedYear={setSelectedYear} yearsInRows={yearsInRows}
                 selectedSemana={selectedSemana} setSelectedSemana={setSelectedSemana} semanasInRows={semanasInRows}
                 semanaComparar={semanaComparar} onCambiarComparacion={cambiarComparacion} onEliminarReporte={handleEliminarReporte}
-                onExportarDatos={handleExportarExcel} onExportarReporte={handleExportarExcelCompleto}
+                onExportarReporte={handleExportarExcelCompleto}
                 resetViewDetail={() => { setViewDetail(null); }}
             />
 
+            <div id="dashboard-atrasos-container" className="p-2 bg-slate-50/50"> 
+                {/* Nota: Agregué bg-slate-50/50 para que al exportar tenga fondo, o usa bg-white */}
             {modoVista === "ATRASOS" ? (
                 <>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 animate-in fade-in duration-500">
@@ -218,6 +225,7 @@ export const SeguimientoOTsView = ({
                     <div><h4 className="text-sm font-black text-slate-500 mb-4 uppercase border-b pb-2">Infraestructura (OB)</h4><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{LISTA_CUMPLIMIENTO.map(p => (<ComplianceCard key={`ob-${p}`} planta={p} esOB={true} dataSemanaActual={dataDashboard} onClick={() => setViewDetail({ id: p, esOB: true })} />))}</div></div>
                 </div>
             )}
+            </div> {/* FIN DEL CONTENEDOR ID */}
 
             <AnalysisDashboard 
                 isOpen={showAnalysis}

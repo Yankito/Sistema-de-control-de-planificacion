@@ -9,7 +9,7 @@ import { AssetDetailView } from "../components/AssetDetailView";
 import { DashboardTab } from "../components/DashboardTab";
 import { CausasTab } from "../components/CausasTab";
 import { TablaTab } from "../components/TablaTab";
-import { ExportButton } from "../components/ExportButton";
+import { ExportButton } from "../../../shared/components/ExportButton";
 
 interface Props {
   data: FallaRow[];
@@ -244,6 +244,7 @@ export const FallasView = ({ data }: Props) => {
                 plantaSeleccionada={plantaFiltro === "TODAS" ? "TODAS LAS PLANTAS" : plantaFiltro}
                 rangoTexto={rangoTextoHeader}
                 semana={semanaFiltro}
+                reportTitle="Reporte de Fallas de Activos"
             />
             
             <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>

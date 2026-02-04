@@ -1,4 +1,4 @@
-// src/hooks/useSeguimientoData.ts
+// src/modules/seguimiento/hooks/useSeguimientoData.ts
 import { useState, useEffect, useCallback } from "react";
 import { AtrasoRow } from "../types";
 import { DatabaseService } from "../../../shared/db/DatabaseService";

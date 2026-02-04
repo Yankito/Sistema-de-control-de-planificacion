@@ -23,7 +23,6 @@ interface SeguimientoHeaderProps {
   semanaComparar: string;
   onCambiarComparacion: (s: string) => void;
   onEliminarReporte: () => void;
-  onExportarDatos: () => void;
   onExportarReporte: () => void;
   resetViewDetail: () => void;
 }
@@ -36,8 +35,7 @@ export const SeguimientoHeader = ({
   selectedYear, setSelectedYear, yearsInRows,
   selectedSemana, setSelectedSemana, semanasInRows,
   // Otros
-  semanaComparar, onCambiarComparacion, onEliminarReporte,
-  onExportarDatos, onExportarReporte, resetViewDetail
+  semanaComparar, onCambiarComparacion, onEliminarReporte, onExportarReporte, resetViewDetail
 }: SeguimientoHeaderProps) => {
 
   const formatLabel = (val: string) => val === "TODAS" ? val : val.split('-')[1] || val;
@@ -113,7 +111,6 @@ export const SeguimientoHeader = ({
         </div>
 
         <div className="flex gap-2">
-            <button onClick={onExportarDatos} className="flex items-center gap-2 bg-slate-200 text-slate-700 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-slate-300 transition-colors"><Download size={14} /> Datos</button>
             {modoVista === "ATRASOS" && <button onClick={onExportarReporte} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-1.5 rounded-xl font-bold text-xs shadow-lg hover:bg-slate-900 transition-colors"><FileText size={14} /> Reporte</button>}
         </div>
       </div>

@@ -67,41 +67,7 @@ const countTotal = (data: AtrasoRow[], planta: string | string[], esOB: boolean,
     }).length;
 };
 
-// --- FUNCIÓN 1: EXPORTAR FILTRADOS ---
-export const exportarAtrasosFiltrados = async (
-    dataFiltrada: AtrasoRow[], 
-    modoVista: "ATRASOS" | "CUMPLIDAS", 
-    selectedSemana: string
-) => {
-    if (dataFiltrada.length === 0) return;
-    try {
-        const dataParaArchivo = dataFiltrada.map(item => ({
-            Planta: item.planta, 
-            OT: item.ot, 
-            Descripcion: item.descripcion, 
-            Estado: item.estado,
-            Clasificacion: item.clasificacion, 
-            Periodo: item.periodo, 
-            Semana: item.semana,
-            Es_OB: item.esOB ? "SI" : "NO",
-            RMD: item.rmd, 
-            RSE: item.rse, 
-            Tecnicos: item.detallesTecnicos?.map(t => t.tecnico).join(", ") || "",
-            Fecha_Proceso: new Date().toLocaleString()
-        }));
-        const ws = XLSX.utils.json_to_sheet(dataParaArchivo);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "DATA_FILTRADA");
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const hoy = new Date();
-        const fechaStr = `${String(hoy.getDate()).padStart(2, '0')}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${hoy.getFullYear()}`;
-        const defaultName = `Dashboard_VistaFiltrada_${fechaStr}.xlsx`;
-        const filePath = await save({ filters: [{ name: 'Excel', extensions: ['xlsx'] }], defaultPath: defaultName });
-        if (filePath) { await writeFile(filePath, new Uint8Array(excelBuffer)); return true; }
-    } catch (e) { console.error("Error", e); throw e; }
-};
-
-// --- FUNCIÓN 2: EXPORTAR REPORTE COMPLETO ---
+// --- FUNCIÓN 1: EXPORTAR REPORTE COMPLETO ---
 export const exportarReporteCompleto = async (
     dataActual: AtrasoRow[], 
     dataAnterior: AtrasoRow[], 

@@ -98,14 +98,14 @@ export const EvolutionDashboard = ({ nuevas, finalizadas, conAvance, semanaActua
         />
         <EvolutionGroup 
             title="Salieron / Finalizadas" 
-            sublabel="OTs que desaparecieron del backlog"
+            sublabel="OTs que finalizaron"
             data={finalizadas} 
             color="green" 
             icon={CheckCircle2} 
         />
         <EvolutionGroup 
-            title="Cambio de Estado" 
-            sublabel="OTs que avanzaron (ej: Lib -> Trat)"
+            title="Cambio de Clasificación"
+            sublabel="OTs atrasadas que cambiaron de clasificación"
             data={conAvance} 
             color="blue" 
             icon={ArrowRightCircle} 
