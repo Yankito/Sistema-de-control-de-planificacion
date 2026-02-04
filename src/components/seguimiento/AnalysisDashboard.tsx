@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { AtrasoRow } from "../../types";
 import { analyzeBacklogFlow, OTFlowResult } from "../../logic/backlogAnalysis";
-import { analyzeTechnicians, TechStats } from "../../logic/technicianAnalysis";
+import { analyzeTechnicians, TechStats, prepareEmployeeProfile } from "../../logic/technicianAnalysis";
 
 import { EmployeeProfile } from "../../views/atrasos/EmployeeProfile";
 import { DashboardListView } from "./DashboardListView";
@@ -89,44 +89,14 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
   const employeeProfileProps = useMemo(() => {
       if (currentView.type !== 'TECH_DETAIL') return null;
       
-      const techName = currentView.data.nombre.toUpperCase();
+      const rawUniverse = [...currentData, ...currentCumplimiento];
       
-      // 1. Unificar fuentes (Backlog + Cumplimiento)
-      // ESTO ASEGURA QUE SE VEAN PENDIENTES Y CUMPLIDAS
-      let allOrders = [...currentData, ...currentCumplimiento].filter(d => 
-          d.detallesTecnicos?.some(t => t.tecnico.toUpperCase() === techName)
+      return prepareEmployeeProfile(
+          currentView.data.nombre.toUpperCase(),
+          rawUniverse,
+          plantasDisponibles
       );
-
-      // --- Calcular plantas activas ---
-      const activePlants = Array.from(new Set(allOrders.map(o => o.planta))).sort();
-
-      // 2. Filtros visuales internos
-      if (empFilters.planta !== "TODAS") {
-          allOrders = allOrders.filter(d => d.planta === empFilters.planta);
-      }
-      if (empFilters.periodo !== "TODOS") {
-          allOrders = allOrders.filter(d => d.periodo === empFilters.periodo);
-      }
-
-      // 3. Deduplicar
-      const uniqueOrders = Array.from(new Map(allOrders.map(item => [item.ot, item])).values());
-
-      // 4. Stats
-      const stats = {
-          total: uniqueOrders.length,
-          cumplidas: uniqueOrders.filter(o => o.detallesTecnicos?.find(t => t.tecnico.toUpperCase() === techName)?.finalizada || o.clasificacion === 'CUMPLIDA').length,
-          pendientes: uniqueOrders.filter(o => !(o.detallesTecnicos?.find(t => t.tecnico.toUpperCase() === techName)?.finalizada || o.clasificacion === 'CUMPLIDA')).length
-      };
-
-      return {
-          employeeName: techName,
-          employeePlants: activePlants,
-          orders: uniqueOrders,
-          stats: stats,
-          listaPlantas: plantasDisponibles.filter(p => p !== "TODAS")
-      };
-
-  }, [currentView, currentData, currentCumplimiento, empFilters, plantasDisponibles]);
+  }, [currentView, currentData, currentCumplimiento, plantasDisponibles]);
 
 
   return (

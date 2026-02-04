@@ -3,6 +3,7 @@ import { X, Search, ChevronLeft, ChevronRight, Filter, Sparkles } from "lucide-r
 import { AtrasoRow } from "../../types";
 import { EmployeeProfile } from "../../views/atrasos/EmployeeProfile";
 import { OTCard } from "../../views/atrasos/OTCard";
+import { filterOrders, normalizeOT } from "../../logic/filterUtils"; // IMPORTAR UTILS
 
 interface SeguimientoModalProps {
   viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean };
@@ -16,9 +17,6 @@ interface SeguimientoModalProps {
   modoVista: "ATRASOS" | "CUMPLIDAS";
 }
 
-// 1. HELPER DE NORMALIZACIÓN (Fuera del componente para evitar recrearlo)
-const normalizeOT = (val: any) => String(val || "").trim().toUpperCase();
-
 export const SeguimientoModal = ({
   viewDetail, onClose, dataModo, dataAnterior = [], selectedSemana,
   LISTA_PLANTAS_INDIVIDUALES, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, modoVista
@@ -31,63 +29,36 @@ export const SeguimientoModal = ({
   const [pagina, setPagina] = useState(1);
   const itemsPorPagina = 10;
 
-  // 2. CREAR SET NORMALIZADO
+  // 1. CREAR SET NORMALIZADO (Solo una vez cuando cambie dataAnterior)
   const previousOtSet = useMemo(() => {
-      // Creamos un Set con las OTs antiguas normalizadas
       return new Set(dataAnterior.map(d => normalizeOT(d.ot)));
   }, [dataAnterior]);
 
-  // 3. AISLAR DATA
-  const baseData = useMemo(() => {
-      return dataModo.filter(d => {
-          const matchTipo = d.esOB === viewDetail.esOB;
-          const matchCat = viewDetail.cat ? d.clasificacion === viewDetail.cat : true;
-          let matchPlanta = true;
+  // 2. FILTRADO OPTIMIZADO USANDO UTIL
+  const { filteredGeneral, estadosDisponibles } = useMemo(() => {
+      // Llamamos a la lógica extraída
+      const { filteredData, baseDataForStates } = filterOrders(
+          dataModo,
+          { viewDetail, filterEstado, searchTerm },
+          { plantasComplejo: PLANTAS_COMPLEJO, plantasPfAlimentos: PLANTAS_PF_ALIMENTOS, previousOtSet }
+      );
 
-          if (viewDetail.isGlobal) {
-              if (viewDetail.id === "COMPLEJO") matchPlanta = PLANTAS_COMPLEJO.includes(d.planta);
-              else if (viewDetail.id === "PF ALIMENTOS") matchPlanta = PLANTAS_PF_ALIMENTOS.includes(d.planta);
-          } else {
-              matchPlanta = d.planta === viewDetail.id;
-          }
-          return matchTipo && matchCat && matchPlanta;
-      });
-  }, [dataModo, viewDetail, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS]);
-
-  // 4. ESTADOS + LOGICA NUEVAS
-  const estadosDisponibles = useMemo(() => {
-      const estados = new Set(baseData.map(d => d.estado));
+      // Calculamos estados disponibles basados en la data base (sin filtrar por texto/estado)
+      const estados = new Set(baseDataForStates.map(d => d.estado));
       const lista = ["TODOS"];
       if (dataAnterior.length > 0) lista.push("NUEVAS");
-      return [...lista, ...Array.from(estados).sort()];
-  }, [baseData, dataAnterior]);
+      
+      return { 
+          filteredGeneral: filteredData, 
+          estadosDisponibles: [...lista, ...Array.from(estados).sort()] 
+      };
 
-  // 5. FILTROS
-  const filteredGeneral = useMemo(() => {
-    let f = baseData;
-
-    // Filtro NUEVAS Normalizado
-    if (filterEstado === "NUEVAS") {
-        f = f.filter(d => !previousOtSet.has(normalizeOT(d.ot)));
-    } else if (filterEstado !== "TODOS") {
-        f = f.filter(d => d.estado === filterEstado);
-    }
-    
-    if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        f = f.filter(d => 
-            d.ot.toLowerCase().includes(term) || 
-            d.descripcion.toLowerCase().includes(term) ||
-            (d.detallesTecnicos && d.detallesTecnicos.some(t => t.tecnico.toLowerCase().includes(term)))
-        );
-    }
-    return f;
-  }, [baseData, searchTerm, filterEstado, previousOtSet]);
+  }, [dataModo, viewDetail, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, filterEstado, searchTerm, previousOtSet, dataAnterior.length]);
 
   const datosPaginados = useMemo(() => filteredGeneral.slice((pagina - 1) * itemsPorPagina, pagina * itemsPorPagina), [filteredGeneral, pagina]);
   const totalPaginas = Math.ceil(filteredGeneral.length / itemsPorPagina);
 
-  // 6. LOGICA EMPLEADO (Aplicando Normalización también aquí)
+  // 3. LOGICA EMPLEADO (Mantenemos local o movemos a utils si crece más)
   const employeeData = useMemo(() => {
     if (!selectedEmployee) return { orders: [], stats: { total: 0, cumplidas: 0, pendientes: 0 } };
     
@@ -96,10 +67,8 @@ export const SeguimientoModal = ({
     if (empFilters.planta !== "TODAS") orders = orders.filter(d => d.planta === empFilters.planta);
     if (empFilters.periodo !== "TODOS") orders = orders.filter(d => d.periodo === empFilters.periodo);
     
-    // Inyección de isNew
     const ordersWithFlag = orders.map(o => ({
         ...o,
-        // Usamos normalizeOT para comparar manzanas con manzanas
         isNew: dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(o.ot))
     }));
 
@@ -176,9 +145,7 @@ export const SeguimientoModal = ({
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
                 {datosPaginados.length > 0 ? (
                     datosPaginados.map((item, idx) => {
-                        // 7. CALCULO EN LISTA PRINCIPAL (Normalizado)
                         const isItemNew = dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(item.ot));
-                        console.log("OT:", item.ot, "isItemNew:", isItemNew);
                         
                         return (
                             <OTCard 

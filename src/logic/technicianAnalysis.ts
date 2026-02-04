@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { AtrasoRow } from "../types";
 
 export interface TechStats {
@@ -8,6 +9,42 @@ export interface TechStats {
   efectividad: number;
   plantas: string[];
 }
+
+// LOGICA PARA PREPARAR DATOS DE EMPLOYEE PROFILE
+export const prepareEmployeeProfile = (
+    techName: string, 
+    allOrders: AtrasoRow[], // Data unificada (Backlog + Cumplimiento)
+    plantasDisponibles: string[]
+) => {
+    const techOrders = allOrders.filter(d => 
+        d.detallesTecnicos?.some(t => t.tecnico.toUpperCase() === techName)
+    );
+
+    // 2. Calcular plantas activas
+    const activePlants = Array.from(new Set(techOrders.map(o => o.planta))).sort();
+
+    // 3. Deduplicar (Por si una OT está en ambas listas, aunque raro, es seguro hacerlo)
+    const uniqueOrders = Array.from(new Map(techOrders.map(item => [item.ot, item])).values());
+
+    // 4. Calcular Stats
+    const stats = {
+        total: uniqueOrders.length,
+        cumplidas: uniqueOrders.filter(o => 
+            o.detallesTecnicos?.find(t => t.tecnico.toUpperCase() === techName)?.finalizada || 
+            o.clasificacion === 'CUMPLIDA'
+        ).length,
+        pendientes: 0 // Se calcula abajo
+    };
+    stats.pendientes = stats.total - stats.cumplidas;
+
+    return {
+        employeeName: techName,
+        employeePlants: activePlants,
+        orders: uniqueOrders,
+        stats: stats,
+        listaPlantas: plantasDisponibles.filter(p => p !== "TODAS")
+    };
+};
 
 export const analyzeTechnicians = (
     backlogData: AtrasoRow[], 
