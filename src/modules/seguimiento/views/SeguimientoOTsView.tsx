@@ -63,10 +63,10 @@ export const SeguimientoOTsView = ({
     );
 
     // Constantes de Plantas
-    const PLANTAS_COMPLEJO = useMemo(() => ["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS"], []);
+    const PLANTAS_COMPLEJO = useMemo(() => ["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "DC", "VENTAS"], []);
     const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
-    const LISTA_CUMPLIMIENTO = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "MPS", "OTROS"], []);
-    const LISTA_PLANTAS_INDIVIDUALES = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS"], []);
+    const LISTA_PLANTAS_INDIVIDUALES = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS", "DC", "VENTAS"], []);
+    const LISTA_CUMPLIMIENTO = useMemo(() => LISTA_PLANTAS_INDIVIDUALES, [LISTA_PLANTAS_INDIVIDUALES]);
 
     // Carga Inicial (Lógica simplificada gracias al hook)
     useEffect(() => {
@@ -123,7 +123,7 @@ export const SeguimientoOTsView = ({
     };
 
     const handleExportarExcelCompleto = async () => {
-        await exportarReporteCompleto(dataActual, modoVista, reporteActual);
+        await exportarReporteCompleto(dataActual, localDataAnterior, modoVista, reporteActual);
     };
 
     const yearsInRows = useMemo(() => ["TODOS", ...Array.from(new Set(dataActual.map(d => d.semana.split('-')[0]))).sort().reverse()], [dataActual]);

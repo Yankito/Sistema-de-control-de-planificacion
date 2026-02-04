@@ -1,8 +1,8 @@
-import * as XLSX from "xlsx";
-import { normalizarColumnas } from "../../planificacion/logic/excelProcessor";
-import { AtrasoRow, MasivoRow, CumplimientoRow, ActivoRow, TecnicoEstado } from "../types";
+import * as XLSX from "xlsx-js-style";
+import { normalizarColumnas } from "../../planificacion/logic/excelProcessor"; // Asegura que la ruta sea correcta
+import { AtrasoRow, MasivoRow, CumplimientoRow, ActivoRow, TecnicoEstado } from "../types"; 
 
-// Helpers de fecha (sin cambios)
+// ... (Helpers de fecha se mantienen igual) ...
 const getWeekLabel = (d: Date): string => {
     const date = new Date(d.getTime());
     date.setHours(0, 0, 0, 0);
@@ -23,9 +23,8 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
   let dataAnterior: AtrasoRow[] = [];
   const hojaHistorico = Object.keys(sheets).find(n => n.toUpperCase().trim() === "RESUMEN_DATA");
   
-  // Procesar Histórico (si existe)
   if (hojaHistorico) {
-    const rawAnterior = XLSX.utils.sheet_to_json(sheets[hojaHistorico]) as any[];
+    const rawAnterior = XLSX.utils.sheet_to_json(sheets[hojaHistorico], { defval: "" }) as any[]; // Agregado defval por seguridad
     dataAnterior = rawAnterior.map(item => ({
         planta: String(item.planta || item.Planta || "").toUpperCase(),
         ot: String(item.ot || item.OT || ""),
@@ -48,11 +47,8 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
       return { actual: [], anterior: [], activos: [], masivoRaw: [], cumplimientoRaw: [] };
   }
 
-  // ========================================================================
-  // 1. PROCESAMIENTO EXACTO DE TABLA CUMPLIMIENTO
-  // Columnas: PLANTA, EMPLEADO, NRO_OT, TIPO, ESTADO_OM, FECHA_PROGRAMADA_INICIO, OP_FINALIZADA
-  // ========================================================================
-  const rawCumplimiento = XLSX.utils.sheet_to_json(sheets["CUMPLIMIENTO"]);
+  // 1. CUMPLIMIENTO
+  const rawCumplimiento = XLSX.utils.sheet_to_json(sheets["CUMPLIMIENTO"], { defval: "" }); // FIX 1
   const dataCumplimientoNorm = normalizarColumnas(rawCumplimiento);
   const mapaCumplimiento = new Map<string, { total: boolean, tecnicos: TecnicoEstado[] }>();
 
@@ -60,7 +56,6 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
       const ot = String(r["NRO_OT"] || "").trim();
       if (!ot) return;
 
-      // A) GUARDAR RAW
       rawCumplimientoData.push({
           planta: String(r["PLANTA"] || ""),
           empleado: String(r["EMPLEADO"] || ""),
@@ -71,7 +66,6 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
           op_finalizada: String(r["OP_FINALIZADA"] || "")
       });
 
-      // B) PROCESAR MAPA (Para inyectar en 'registros' y pintar UI)
       const empleado = String(r["EMPLEADO"] || "").trim();
       const opFin = String(r["OP_FINALIZADA"] || "").toUpperCase().trim();
       const finalizada = opFin === "SI";
@@ -85,26 +79,22 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
   });
 
   // ========================================================================
-  // 2. PROCESAMIENTO DE MASIVO (Datos extra)
-  // Columnas: Número, Activo, Descripción, TPT...
+  // 2. PROCESAMIENTO DE MASIVO (AQUÍ ESTABA EL ERROR)
   // ========================================================================
-  const dataMasivo = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["MASIVO"]));
+  // FIX CRÍTICO: { defval: "" } obliga a leer TODAS las columnas del encabezado, 
+  // aunque la primera fila tenga RSE vacío.
+  const dataMasivo = normalizarColumnas(XLSX.utils.sheet_to_json(sheets["MASIVO"], { defval: "" }));
   const masivoLookup = new Map<string, { rmd: string, rse: string }>();
 
   dataMasivo.forEach(r => {
-      // CORRECCIÓN 1: Usar las claves en MAYÚSCULAS (porque normalizarColumnas las transformó)
       const ot = String(r["NÚMERO"] || r["NUMERO"] || r["NUMBER"] || "").trim();
-      
       if (!ot) return;
 
-      // CORRECCIÓN 2: Agregar .toUpperCase() para estandarizar "Si"/"si" a "SI"
       const valRmd = String(r["RMD"] || "").trim().toUpperCase();
       const valRse = String(r["RSE"] || "").trim().toUpperCase();
 
-      // A) GUARDAR RAW
       rawMasivoData.push({
           numero_ot: ot,
-          // Asegúrate de usar mayúsculas aquí también para leer
           activo: String(r["ACTIVO"] || "").trim(), 
           descripcion: String(r["DESCRIPCIÓN"] || r["DESCRIPCION"] || "").trim(),
           tpt: String(r["TPT"] || "").trim(),
@@ -114,14 +104,11 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
           rse: valRse
       });
 
-      // B) GUARDAR LOOKUP
       masivoLookup.set(ot, { rmd: valRmd, rse: valRse });
   });
   
-  // ========================================================================
-  // 3. PROCESAMIENTO DE ACTIVOS
-  // ========================================================================
-  const dfActivos = sheets["ACTIVOS"] ? normalizarColumnas(XLSX.utils.sheet_to_json(sheets["ACTIVOS"])) : [];
+  // 3. ACTIVOS
+  const dfActivos = sheets["ACTIVOS"] ? normalizarColumnas(XLSX.utils.sheet_to_json(sheets["ACTIVOS"], { defval: "" })) : [];
   if (dfActivos.length > 0) {
       dfActivos.forEach(a => {
           const cc = String(a["CC"] || "").replace(/[()]/g, "").trim();
@@ -136,10 +123,7 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
       });
   }
 
-  // ========================================================================
-  // 4. PROCESAMIENTO DE PEDIDOS (PF1, PF2, MP3, MPS) -> ATRASOS
-  // Columnas: Pedido de Trabajo, Número de Activo, Grupo de Activos, Descripción, Estado...
-  // ========================================================================
+  // 4. CRUCE FINAL
   const hojasPlantas = ["PF1", "PF2", "MP3", "MPS"];
   const estadosFinalizados = ["Finalizado", "Finalizado Sin Cargos", "Finalizar - Sin Cargos", "Cerrado", "Cierre Técnico"];
   const estadosInteres = ["Liberado", ...estadosFinalizados];
@@ -147,7 +131,8 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
 
   hojasPlantas.forEach(nombreHoja => {
     if (!sheets[nombreHoja]) return;
-    const dfPlanta = normalizarColumnas(XLSX.utils.sheet_to_json(sheets[nombreHoja]));
+    // FIX: Agregado defval aquí también
+    const dfPlanta = normalizarColumnas(XLSX.utils.sheet_to_json(sheets[nombreHoja], { defval: "" }));
 
     dfPlanta.forEach(fila => {
       const nroOT = String(fila["PEDIDO DE TRABAJO"] || "").trim();
@@ -158,23 +143,29 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
       const descripcion = String(fila["DESCRIPCIÓN"] || "").trim();
       otsProcesadasEnCiclo.add(nroOT);
 
-      // Usar Mapas
       const infoCumple = mapaCumplimiento.get(nroOT);
       const infoMasivo = masivoLookup.get(nroOT);
-      console.log(`Procesando OT ${nroOT}: Estado='${estado}', InfoCumple=${infoCumple ? "SI" : "NO"}, InfoMasivo=${infoMasivo ? "SI" : "NO"}`);
-      const valRmd = infoMasivo ? infoMasivo.rmd.toUpperCase() : "N/A";
-      const valRse = infoMasivo ? infoMasivo.rse.toUpperCase() : "N/A";
+
+      // LÓGICA RMD/RSE: Si no está en masivo es N/A.
+      const valRmd = infoMasivo ? infoMasivo.rmd : "N/A";
+      const valRse = infoMasivo ? infoMasivo.rse : "N/A";
 
       let clasificacion: any;
-      if (estadosFinalizados.includes(estado)) { clasificacion = "CUMPLIDA"; } 
-      else {
-        if (!infoCumple) clasificacion = "OC / OTRO";
-        else if (!infoCumple.total) clasificacion = "TECNICO / SERVICIO";
-        else if (!infoMasivo) clasificacion = "OC / OTRO";
-        else {
-          const rmdOk = valRmd === "SI" || valRmd === "" || valRmd === "0";
-          const rseOk = valRse === "SI" || valRse === "" || valRse === "0";
-          clasificacion = (rmdOk && rseOk) ? "PROGRAMADOR" : "OC / OTRO";
+      if (estadosFinalizados.includes(estado)) { 
+          clasificacion = "CUMPLIDA"; 
+      } else {
+        if (!infoCumple) {
+            clasificacion = "OC / OTRO";
+        } else if (!infoCumple.total) {
+            clasificacion = "TECNICO / SERVICIO";
+        } else if (!infoMasivo) {
+            clasificacion = "OC / OTRO"; // No está en masivo
+        } else {
+            // "SI", "0" o vacío cuentan como OK
+            const rmdOk = valRmd === "SI" || valRmd === "" || valRmd === "0";
+            const rseOk = valRse === "SI" || valRse === "" || valRse === "0";
+            
+            clasificacion = (rmdOk && rseOk) ? "PROGRAMADOR" : "OC / OTRO";
         }
       }
 
@@ -194,7 +185,6 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
         }
       }
 
-      // Fechas
       const fechaRaw = fila["FECHA INICIAL PROGRAMADA"];
       let periodo = "S/A";
       let semana = "S/D";

@@ -1,6 +1,6 @@
 // src/logic/__tests__/seguimientoProcessor.test.ts
 import { describe, it, expect } from 'vitest';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { processSeguimientoOTs } from '../seguimientoOTsProcessor';
 
 // Helper para crear hojas de cálculo falsas rápido

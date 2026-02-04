@@ -1,5 +1,5 @@
 // src/logic/fallasProcessor.ts
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { FallaRow } from "../types";
 
 // Helper para limpiar dinero: "$510.164" -> 510164

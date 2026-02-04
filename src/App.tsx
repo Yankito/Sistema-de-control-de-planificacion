@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 // ... imports ...
 import { Sidebar } from "./shared/components/Sidebar";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { 
   processExcelData, 
   obtenerHorariosPorPlanta, 
