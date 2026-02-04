@@ -1,28 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 // ... imports ...
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar } from "./shared/components/Sidebar";
 import * as XLSX from "xlsx";
 import { 
   processExcelData, 
   obtenerHorariosPorPlanta, 
   obtenerMapaHorarios  
-} from "./logic/excelProcessor";
-import { PlannerService } from "./logic/PlannerService";
-import { PlanResult, HorarioTecnico, FallaRow, AtrasoRow } from "./types";
-import { FileUploader, FileType } from "./components/FileUploader";
+} from "./modules/planificacion/logic/excelProcessor";
+import { PlannerService } from "./modules/planificacion/logic/PlannerService";
+import { AtrasoRow } from "./modules/seguimiento/types";
+import {PlanResult, HorarioTecnico} from "./modules/planificacion/types";
+
+import { FileUploader, FileType } from "./shared/components/FileUploader";
 import { DashboardView } from "./views/DashboardView";
-import { HorariosView } from "./views/HorariosView";
-import { PlanificacionView } from "./views/PlanificacionView";
-import { processSeguimientoOTs } from "./logic/seguimientoOTsProcessor";
-import { SeguimientoOTsView } from "./views/SeguimientoOTsView";
-import { ModalAsignacionTecnico } from './components/planificacion/ModalAsignacionTecnico';
-import { SeguimientoTecnicosView } from "./views/SeguimientoTecnicosView";
-import { necesitaValidacionTurno } from "./utils/planificacionUtils";
-import { processFallasData } from "./logic/fallasProcessor";
-import { FallasView } from "./views/FallasView";
-import { DatabaseService } from "./db/DatabaseService";
-import { getWeekOptions } from "./utils/dateUtils";
+import { HorariosView } from "./modules/planificacion/views/HorariosView";
+import { PlanificacionView } from "./modules/planificacion/views/PlanificacionView";
+import { processSeguimientoOTs } from "./modules/seguimiento/logic/seguimientoOTsProcessor";
+import { SeguimientoOTsView } from "./modules/seguimiento/views/SeguimientoOTsView";
+import { ModalAsignacionTecnico } from './modules/planificacion/components/ModalAsignacionTecnico';
+import { SeguimientoTecnicosView } from "./modules/planificacion/views/SeguimientoTecnicosView";
+import { necesitaValidacionTurno } from "./modules/planificacion/utils/planificacionUtils";
+import { processFallasData } from "./modules/fallas/logic/fallasProcessor";
+import { FallasView } from "./modules/fallas/views/FallasView";
+import { FallaRow } from "./modules/fallas/types";
+import { DatabaseService } from "./shared/db/DatabaseService";
+import { getWeekOptions } from "./shared/utils/dateUtils";
 
 function App() {
   const [activeTab, setActiveTab] = useState("dash");

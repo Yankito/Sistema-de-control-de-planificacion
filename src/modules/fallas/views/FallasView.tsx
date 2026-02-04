@@ -1,0 +1,297 @@
+import { useState, useMemo } from "react";
+import { FallaRow } from "../types";
+import { Filter, LayoutDashboard, Table as TableIcon, PieChart, XCircle, ArrowRight } from "lucide-react";
+import { getRangoSemana } from "../../../shared/utils/dateUtils";
+
+// Imports componentes
+import { SelectPill } from "../components/FallasUI";
+import { AssetDetailView } from "../components/AssetDetailView";
+import { DashboardTab } from "../components/DashboardTab";
+import { CausasTab } from "../components/CausasTab";
+import { TablaTab } from "../components/TablaTab";
+import { ExportButton } from "../components/ExportButton";
+
+interface Props {
+  data: FallaRow[];
+}
+
+export const FallasView = ({ data }: Props) => {
+  // --- 1. CONFIGURACIÓN ---
+  const { semanasDisponibles, aniosDisponibles, plantasDisponibles, anioDefault } = useMemo(() => {
+    if (data.length === 0) return { semanasDisponibles: [], aniosDisponibles: [], plantasDisponibles: [], anioDefault: new Date().getFullYear() };
+    
+    const semanas = Array.from(new Set(data.map(d => d.semana))).sort((a, b) => b - a);
+    const anios = Array.from(new Set(data.map(d => d.anio))).sort((a, b) => b - a);
+    const plantas = Array.from(new Set(data.map(d => d.planta))).sort();
+    
+    return { semanasDisponibles: semanas, aniosDisponibles: anios, plantasDisponibles: plantas, anioDefault: anios[0] };
+  }, [data]);
+
+  // --- 2. ESTADOS ---
+  const [anioFiltro, setAnioFiltro] = useState<number>(anioDefault);
+  const [plantaFiltro, setPlantaFiltro] = useState<string>("TODAS");
+  const [semanaFiltro, setSemanaFiltro] = useState<string>("TODAS");
+  const [activeTab, setActiveTab] = useState<'DASH' | 'CAUSAS' | 'TABLA'>('DASH');
+  const [topN, setTopN] = useState<number>(5);
+  
+  // Navegación
+  const [activoSeleccionado, setActivoSeleccionado] = useState<string | null>(null);
+  const [filtroDrill, setFiltroDrill] = useState<{tipo: 'EQUIPO' | 'CAUSA', valor: string} | null>(null);
+
+  // --- 3. DATOS PARA LA LÍNEA DE TIEMPO (Ignora filtro de semana) ---
+  const timelineStats = useMemo(() => {
+    const datosContexto = data.filter(d => {
+        const matchAnio = d.anio === anioFiltro;
+        const matchPlanta = plantaFiltro === "TODAS" ? true : d.planta === plantaFiltro;
+        let matchDrill = true;
+        if (filtroDrill) {
+            if (filtroDrill.tipo === 'EQUIPO') matchDrill = d.equipo === filtroDrill.valor;
+            if (filtroDrill.tipo === 'CAUSA') matchDrill = (d.causa || "").trim().toUpperCase() === filtroDrill.valor;
+        }
+        return matchAnio && matchPlanta && matchDrill;
+    });
+
+    if (datosContexto.length === 0) return { chartData: [], maxVal: 0 };
+
+    const groups = datosContexto.reduce((acc, curr) => {
+        acc[curr.semana] = (acc[curr.semana] || 0) + 1;
+        return acc;
+    }, {} as Record<number, number>);
+
+    const weeks = datosContexto.map(d => d.semana);
+    const minW = Math.min(...weeks);
+    const maxW = Math.max(...weeks);
+    
+    const chartData = [];
+    let maxVal = 0;
+
+    for (let i = minW; i <= maxW; i++) {
+        const count = groups[i] || 0;
+        if (count > maxVal) maxVal = count;
+        chartData.push({ 
+            semana: i, 
+            count,
+            rango: getRangoSemana(i, anioFiltro) 
+        });
+    }
+    return { chartData, maxVal };
+  }, [data, anioFiltro, plantaFiltro, filtroDrill]);
+
+  // --- 4. FILTRO MAESTRO ---
+  const { datosFiltrados, datosAnioAnterior } = useMemo(() => {
+    // Función auxiliar de filtrado
+    const filtrar = (anioTarget: number) => {
+        return data.filter(d => {
+            const matchAnio = d.anio === anioTarget;
+            const matchPlanta = plantaFiltro === "TODAS" ? true : d.planta === plantaFiltro;
+            const matchSemana = semanaFiltro === "TODAS" ? true : d.semana === Number(semanaFiltro);
+            let matchDrill = true;
+            if (filtroDrill) {
+                if (filtroDrill.tipo === 'EQUIPO') matchDrill = d.equipo === filtroDrill.valor;
+                if (filtroDrill.tipo === 'CAUSA') matchDrill = (d.causa || "").trim().toUpperCase() === filtroDrill.valor;
+            }
+            return matchAnio && matchPlanta && matchSemana && matchDrill;
+        });
+    };
+
+    return {
+        datosFiltrados: filtrar(anioFiltro),
+        datosAnioAnterior: filtrar(anioFiltro - 1) // Calculamos lo mismo para el año anterior
+    };
+  }, [data, anioFiltro, plantaFiltro, semanaFiltro, filtroDrill]);
+
+  // --- 5. ANALYTICS ---
+  const analytics = useMemo(() => {
+    // A. AÑO ACTUAL
+    const totalGasto = datosFiltrados.reduce((a, b) => a + b.gasto, 0);
+    const totalTiempo = datosFiltrados.reduce((a, b) => a + b.duracionMinutos, 0);
+    const totalEventos = datosFiltrados.length;
+    const mttrGlobal = totalEventos > 0 ? totalTiempo / totalEventos : 0;
+
+    // B. AÑO ANTERIOR (NUEVO CÁLCULO)
+    const totalGastoPrev = datosAnioAnterior.reduce((a, b) => a + b.gasto, 0);
+    const totalTiempoPrev = datosAnioAnterior.reduce((a, b) => a + b.duracionMinutos, 0);
+    const totalEventosPrev = datosAnioAnterior.length;
+    const mttrGlobalPrev = totalEventosPrev > 0 ? totalTiempoPrev / totalEventosPrev : 0;
+
+    // 2. Mapa de Datos Año Anterior (Para búsqueda rápida)
+    // Agrupamos por equipo para poder comparar "Manzanas con Manzanas"
+    const prevMap = datosAnioAnterior.reduce((acc, curr) => {
+        if (!acc[curr.equipo]) acc[curr.equipo] = { gasto: 0, tiempo: 0, count: 0 };
+        acc[curr.equipo].gasto += curr.gasto;
+        acc[curr.equipo].tiempo += curr.duracionMinutos;
+        acc[curr.equipo].count += 1;
+        return acc;
+    }, {} as Record<string, { gasto: number, tiempo: number, count: number }>);
+
+    // 3. Agrupación Principal (Año Actual) + Inyección de Comparación
+    const groupBy = (keyFn: (d: FallaRow) => string) => {
+        const map = datosFiltrados.reduce((acc, curr) => {
+            const key = keyFn(curr);
+            if (!acc[key]) {
+                // Buscamos si existe dato del año anterior para este equipo
+                const prevData = prevMap[key] || { gasto: 0, tiempo: 0, count: 0 };
+                
+                acc[key] = { 
+                    label: key, 
+                    gasto: 0, 
+                    tiempo: 0, 
+                    count: 0,
+                    // Datos de comparación
+                    prevGasto: prevData.gasto,
+                    prevTiempo: prevData.tiempo,
+                    prevCount: prevData.count,
+                    prevMttr: prevData.count > 0 ? prevData.tiempo / prevData.count : 0
+                };
+            }
+            acc[key].gasto += curr.gasto;
+            acc[key].tiempo += curr.duracionMinutos;
+            acc[key].count += 1;
+            return acc;
+        }, {} as Record<string, any>);
+        return Object.values(map);
+    };
+
+    // Rankings DINÁMICOS
+    const porFrecuencia = groupBy(d => d.equipo).sort((a, b) => b.count - a.count).slice(0, topN);
+    const porCosto = groupBy(d => d.equipo).sort((a, b) => b.gasto - a.gasto).slice(0, topN);
+    const porTiempo = groupBy(d => d.equipo).sort((a, b) => b.tiempo - a.tiempo).slice(0, topN);
+    
+    const porMTTR = groupBy(d => d.equipo)
+        .map(d => ({ ...d, mttr: d.tiempo / (d.count || 1) }))
+        .sort((a, b) => b.mttr - a.mttr).slice(0, topN);
+        
+    const porCausa = groupBy(d => (d.causa || "S/D").trim().toUpperCase()).sort((a, b) => b.count - a.count).slice(0, Math.max(topN, 10));
+
+    // Datos para el HERO
+    const heroStats = {
+        totalGasto,
+        totalEventos,
+        totalTiempo,
+        topCritico: porFrecuencia.length > 0 ? porFrecuencia[0] : null,
+        topLista: groupBy(d => d.equipo).sort((a,b) => b.count - a.count).slice(0,3) 
+    };
+
+    return { 
+        totalGasto, totalTiempo, totalEventos, mttrGlobal,
+        totalGastoPrev, totalTiempoPrev, totalEventosPrev, mttrGlobalPrev,
+        porCosto, porFrecuencia, porMTTR, porTiempo, porCausa, heroStats 
+    };
+  }, [datosFiltrados, datosAnioAnterior, topN]);
+
+  const rangoTextoHeader = useMemo(() => {
+      if (semanaFiltro !== "TODAS") {
+          return getRangoSemana(Number(semanaFiltro), anioFiltro);
+      }
+      return `Año ${anioFiltro}`;
+  }, [semanaFiltro, anioFiltro]);
+
+  // --- RENDER ---
+  if (activoSeleccionado) {
+      return (
+          <AssetDetailView 
+            assetName={activoSeleccionado} 
+            data={data.filter(d => d.anio === anioFiltro)} 
+            onBack={() => setActivoSeleccionado(null)}
+          />
+      );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20 font-sans text-slate-800">
+      
+      {/* HEADER */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col xl:flex-row justify-between items-center gap-6">
+        <div>
+            <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">Dashboard de Activos</h2>
+                {filtroDrill && (
+                    <span className="px-3 py-1 bg-pf-red/10 text-pf-red rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer hover:bg-pf-red/20 transition-colors" onClick={() => setFiltroDrill(null)}>
+                        <Filter size={12}/> {filtroDrill.valor} <XCircle size={14}/>
+                    </span>
+                )}
+            </div>
+            
+            <div className="flex items-center gap-4 mt-2">
+                <p className="text-sm text-slate-500 font-medium">
+                    Visualizando: <span className="font-bold text-slate-700">{rangoTextoHeader}</span>
+                </p>
+                <p className="text-sm text-slate-500 font-medium">
+                    Planta: <span className="font-bold text-slate-700">{plantaFiltro === "TODAS" ? "Todas las Plantas" : plantaFiltro}</span>
+                </p>
+                {filtroDrill?.tipo === 'EQUIPO' && (
+                    <button 
+                        onClick={() => setActivoSeleccionado(filtroDrill.valor)}
+                        className="flex items-center gap-2 bg-slate-800 text-white text-xs font-bold px-3 py-1 rounded-lg hover:bg-slate-700 hover:scale-105 transition-all shadow-md animate-in fade-in slide-in-from-left-2"
+                    >
+                        Ver Historial Detallado <ArrowRight size={12}/>
+                    </button>
+                )}
+            </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 items-center justify-end">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                <span className="px-2 text-[10px] font-bold text-slate-400 uppercase">Top:</span>
+                {[5, 10, 20].map(n => (
+                    <button key={n} onClick={() => setTopN(n)} className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${topN === n ? 'bg-white text-pf-red shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{n}</button>
+                ))}
+            </div>
+            
+            <ExportButton 
+                elementId="container-reporte-final" 
+                fileName={` ${plantaFiltro}_${semanaFiltro === 'TODAS' ? 'Anual' : 'S'+semanaFiltro}`} 
+                plantaSeleccionada={plantaFiltro === "TODAS" ? "TODAS LAS PLANTAS" : plantaFiltro}
+                rangoTexto={rangoTextoHeader}
+                semana={semanaFiltro}
+            />
+            
+            <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>
+            <div className="bg-slate-100 p-1 rounded-xl flex">
+                <button onClick={() => setActiveTab('DASH')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'DASH' ? 'bg-white text-pf-red shadow' : 'text-slate-400'}`}><LayoutDashboard size={14}/> <span className="hidden sm:inline">General</span></button>
+                <button onClick={() => setActiveTab('CAUSAS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'CAUSAS' ? 'bg-white text-pf-red shadow' : 'text-slate-400'}`}><PieChart size={14}/> <span className="hidden sm:inline">Causas</span></button>
+                <button onClick={() => setActiveTab('TABLA')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'TABLA' ? 'bg-white text-pf-red shadow' : 'text-slate-400'}`}><TableIcon size={14}/> <span className="hidden sm:inline">Datos</span></button>
+            </div>
+            <div className="flex gap-2">
+                <SelectPill value={semanaFiltro} onChange={setSemanaFiltro} options={semanasDisponibles} label="Semana" allLabel="Todas" />
+                <SelectPill value={plantaFiltro} onChange={setPlantaFiltro} options={plantasDisponibles} label="Planta" allLabel="Todas" />
+                <SelectPill 
+                    value={anioFiltro} 
+                    onChange={(val: string | number) => setAnioFiltro(Number(val))} 
+                    options={aniosDisponibles} 
+                    label="Año" 
+                />
+            </div>
+        </div>
+      </div>
+
+      <div id="container-reporte-final" className="p-1">
+        {activeTab === 'DASH' && (
+            <DashboardTab 
+                analytics={analytics} 
+                semanaFiltro={semanaFiltro} 
+                setSemanaFiltro={setSemanaFiltro} 
+                timelineStats={timelineStats} 
+                filtroDrill={filtroDrill} 
+                setFiltroDrill={setFiltroDrill} 
+                rangoTexto={rangoTextoHeader}
+                topN={topN}
+                anioFiltro={anioFiltro} // Pasamos el año para mostrarlo en la comparación
+            />
+        )}
+
+        {activeTab === 'CAUSAS' && (
+            <CausasTab 
+                analytics={analytics} 
+                filtroDrill={filtroDrill} 
+                setFiltroDrill={setFiltroDrill} 
+            />
+        )}
+
+        {activeTab === 'TABLA' && (
+            <TablaTab data={datosFiltrados} />
+        )}
+      </div>
+    </div>
+  );
+};

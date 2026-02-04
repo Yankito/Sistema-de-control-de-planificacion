@@ -1,6 +1,8 @@
 import { useMemo } from "react";
-import { PlanResult, FallaRow, AtrasoRow } from "../types"; 
-import { FileType } from "../components/FileUploader"; // Importamos el tipo
+import { AtrasoRow } from "../modules/seguimiento/types";
+import { PlanResult } from "../modules/planificacion/types";
+import { FallaRow } from "../modules/fallas/types";
+import { FileType } from "../shared/components/FileUploader";
 import { 
   PlayCircle, Scale, CalendarCheck, Clock, AlertTriangle, ArrowRight, Activity, BarChart2, TrendingUp, LucideIcon
 } from "lucide-react";
