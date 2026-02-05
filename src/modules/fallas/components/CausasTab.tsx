@@ -1,5 +1,5 @@
 import { Search, AlertTriangle } from "lucide-react";
-import { HeaderSection } from "./FallasUI";
+import { HeaderSection } from "./ui/HeaderSection";
 
 export const CausasTab = ({ analytics, filtroDrill, setFiltroDrill }: any) => {
   return (

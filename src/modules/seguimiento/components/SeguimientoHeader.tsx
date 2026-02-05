@@ -1,5 +1,5 @@
 // src/components/seguimiento/SeguimientoHeader.tsx
-import { Filter, History, Trash2, Calendar, Download, FileText, Database } from "lucide-react";
+import { Filter, History, Trash2, Calendar, FileText, Database } from "lucide-react";
 
 interface SeguimientoHeaderProps {
   modoVista: "ATRASOS" | "CUMPLIDAS";

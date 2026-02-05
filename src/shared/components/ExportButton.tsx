@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { toPng } from "html-to-image";
-import { save } from "@tauri-apps/plugin-dialog"; // Para elegir carpeta/archivo
-import { writeFile } from "@tauri-apps/plugin-fs"; // Para guardar los bytes
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 
 interface ExportButtonProps {
   elementId: string;
@@ -27,7 +27,6 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
     setIsExporting(true);
 
     try {
-      // --- 1. CLONAR Y PREPARAR (Igual que antes) ---
       const clone = node.cloneNode(true) as HTMLElement;
       Object.assign(clone.style, {
         position: "fixed",

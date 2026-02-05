@@ -1,5 +1,5 @@
 import { Factory, CheckCircle2, AlertCircle } from "lucide-react";
-import { AtrasoRow } from "../../../types";
+import { AtrasoRow } from "../types";
 
 interface ComplianceCardProps {
   planta: string;

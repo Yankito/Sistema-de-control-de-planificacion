@@ -1,39 +1,38 @@
-// src/modules/seguimiento/hooks/useSeguimientoData.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { AtrasoRow } from "../types";
 import { DatabaseService } from "../../../shared/db/DatabaseService";
 
 export const useSeguimientoData = (
-    initialData: AtrasoRow[],
-    initialAnterior: AtrasoRow[],
-    initialCumplimiento: AtrasoRow[],
-    historialCompleto: string[],
-    callbacks?: {
-        onCargarSemana?: (s: string) => void;
-        onCambioComparacion?: (d: AtrasoRow[]) => void;
-    }
+    // Ya no necesitamos pasar initialData si el hook va a gestionar el estado maestro
+    historialCompleto: string[]
 ) => {
-    const [dataActual, setDataActual] = useState(initialData);
-    const [dataAnterior, setDataAnterior] = useState(initialAnterior);
-    const [dataCumplimiento, setDataCumplimiento] = useState(initialCumplimiento);
+    // ESTADO PRINCIPAL (Ahora vive aquí, no disperso en App)
+    const [dataActual, setDataActual] = useState<AtrasoRow[]>([]);
+    const [dataAnterior, setDataAnterior] = useState<AtrasoRow[]>([]);
+    const [dataCumplimiento, setDataCumplimiento] = useState<AtrasoRow[]>([]);
     
-    // Estado interno para la UI
     const [reporteActual, setReporteActual] = useState<string>("");
     const [semanaComparar, setSemanaComparar] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
 
-    // Sincronizar props iniciales cuando cambian desde el padre (App.tsx)
-    useEffect(() => { setDataActual(initialData); }, [initialData]);
-    useEffect(() => { setDataAnterior(initialAnterior); }, [initialAnterior]);
-    useEffect(() => { setDataCumplimiento(initialCumplimiento); }, [initialCumplimiento]);
+    // Función para setear datos manualmente (ej: cuando subes un Excel en App.tsx)
+    const setDatosManuales = useCallback((actual: AtrasoRow[], anterior: AtrasoRow[], cumplimiento: AtrasoRow[], reporteLabel: string) => {
+        setDataActual(actual);
+        setDataAnterior(anterior);
+        setDataCumplimiento(cumplimiento);
+        setReporteActual(reporteLabel);
+    }, []);
 
-    // Lógica principal de carga
+    // Lógica de Carga desde DB
     const cargarReporte = useCallback(async (nuevoReporte: string) => {
+        // Evitar recarga si ya tenemos ese reporte cargado
+        if (nuevoReporte === reporteActual && dataActual.length > 0) return;
+
         setIsLoading(true);
         setReporteActual(nuevoReporte);
         
         try {
-            // 1. Calcular label anterior automáticamente
+            // 1. Calcular label anterior automático
             const match = nuevoReporte.match(/(\d{4})-S(\d+)/);
             let prevLabel = "";
             if (match) {
@@ -44,15 +43,14 @@ export const useSeguimientoData = (
                     : `${year - 1}-S52`;
             }
             
-            // Verificar si existe en el historial
             const existeAnterior = historialCompleto.includes(prevLabel);
             const labelAnterior = existeAnterior ? prevLabel : "";
             setSemanaComparar(labelAnterior);
 
             // 2. Fetch Paralelo
             const [resActual, resAnterior, resCumple] = await Promise.all([
-                DatabaseService.getSnapshot(nuevoReporte, 'ATRASOS'),
-                labelAnterior ? DatabaseService.getSnapshotLite(labelAnterior, 'ATRASOS') : Promise.resolve([]),
+                DatabaseService.getSnapshot(nuevoReporte, 'SEGUIMIENTO'),
+                labelAnterior ? DatabaseService.getSnapshotLite(labelAnterior, 'SEGUIMIENTO') : Promise.resolve([]),
                 DatabaseService.getSnapshot(nuevoReporte, 'CUMPLIMIENTO')
             ]);
 
@@ -60,49 +58,53 @@ export const useSeguimientoData = (
             setDataAnterior(resAnterior);
             setDataCumplimiento(resCumple);
 
-            // Ejecutar callbacks si existen
-            if (callbacks?.onCargarSemana) callbacks.onCargarSemana(nuevoReporte);
-            if (callbacks?.onCambioComparacion) callbacks.onCambioComparacion(resAnterior);
-
         } catch (error) {
             console.error("Error cargando reporte", error);
         } finally {
             setIsLoading(false);
         }
-    }, [historialCompleto, callbacks]);
+    }, [historialCompleto, reporteActual, dataActual.length]);
 
-    // Lógica para cambiar comparación manualmente
+    // Comparación Manual
     const cambiarComparacion = useCallback(async (semana: string) => {
         setIsLoading(true);
         setSemanaComparar(semana);
         try {
             if (semana === "") {
                 setDataAnterior([]);
-                if (callbacks?.onCambioComparacion) callbacks.onCambioComparacion([]);
             } else {
-                const datos = await DatabaseService.getSnapshotLite(semana, 'ATRASOS');
+                const datos = await DatabaseService.getSnapshotLite(semana, 'SEGUIMIENTO');
                 setDataAnterior(datos);
-                if (callbacks?.onCambioComparacion) callbacks.onCambioComparacion(datos);
             }
         } catch(e) { console.error(e); } 
         finally { setIsLoading(false); }
-    }, [callbacks]);
+    }, []);
 
     const limpiarComparacion = useCallback(() => {
         setSemanaComparar("");
         setDataAnterior([]);
     }, []);
 
+    const resetTodo = useCallback(() => {
+        setDataActual([]);
+        setDataAnterior([]);
+        setDataCumplimiento([]);
+        setReporteActual("");
+    }, []);
+
     return {
+        // Datos
         dataActual,
         dataAnterior,
         dataCumplimiento,
         reporteActual,
         semanaComparar,
         isLoading,
-        setReporteActual, // Por si necesitas setearlo manualmente sin cargar (inicio)
+        // Acciones
         cargarReporte,
         cambiarComparacion,
-        limpiarComparacion
+        limpiarComparacion,
+        setDatosManuales, // Para conectar con el Excel Uploader
+        resetTodo
     };
 };

@@ -1,5 +1,5 @@
 // test/mocks.ts
-import { AtrasoRow } from "../types";
+import { AtrasoRow } from "../modules/seguimiento/types";
 
 export const MOCK_DATA: AtrasoRow[] = [
     {

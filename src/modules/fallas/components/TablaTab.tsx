@@ -1,5 +1,5 @@
 import { clp, num, fechaFmt } from "../../../shared/utils/dateUtils";
-import { FallaRow } from "../../../types";
+import { FallaRow } from "../types";
 
 interface Props {
     data: FallaRow[];

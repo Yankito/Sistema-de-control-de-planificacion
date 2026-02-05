@@ -1,10 +1,7 @@
 import { X, Moon, UserMinus, Plus, Trash2, Wand2, ShieldCheck, User } from "lucide-react";
-import { 
-  esPlantaCompatible, 
-  rolesCoinciden, 
-  necesitaValidacionTurno,
-  CONFIG_ROLES
-} from "../utils/planificacionUtils";
+import { CONFIG_ROLES } from "../utils/planificacionUtils";
+import { useModalAsignacion } from "../hooks/useModalAsignacion"; // Importamos el Hook
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -16,53 +13,20 @@ interface Props {
   onModificarCupos: (ordenId: string, accion: 'ADD' | 'REMOVE', rol?: string, indice?: number) => void;
 }
 
-const BLOQUEOS_SABADO = ['L', 'V', 'LIC', 'LM', 'LP'];
-
 export const ModalAsignacionTecnico = ({ 
   isOpen, onClose, orden, fecha, empleados, mapaHorarios, onAsignar, onModificarCupos 
 }: Props) => {
     
   if (!isOpen || !orden) return null;
 
-  const [d, m, y] = fecha.split('/').map(Number);
-  const diaIndex = d - 1; 
-  const fechaObj = new Date(y, m - 1, d);
-  const esSabado = fechaObj.getDay() === 6;
-
-  const tecnicosYaAsignados = orden.tecnicos
-    .map((t: any) => t.nombre)
-    .filter((n: string) => n !== 'VACANTE');
-
-  // --- FUNCIÓN SUGERIR AUTOMÁTICO ---
-  const sugerirTecnicosFaltantes = () => {
-      orden.tecnicos.forEach((slot: any, idx: number) => {
-          if (slot.nombre === 'VACANTE') {
-              const candidatos = empleados.filter((emp: any) => {
-                  return rolesCoinciden(slot.rol, emp.rol) && esPlantaCompatible(emp.planta, orden.planta);
-              });
-
-              const mejorCandidato = candidatos.find((cand: any) => {
-                  const nombre = cand.key || cand.nombre;
-                  if (tecnicosYaAsignados.includes(nombre)) return false; 
-
-                  if (!necesitaValidacionTurno(cand.rol)) return true;
-
-                  const turnos = mapaHorarios.get(nombre);
-                  const turnoDia = turnos ? turnos[diaIndex] : "?";
-                  const turnoLimpio = String(turnoDia).trim().toUpperCase();
-
-                  if (esSabado) return !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b));
-                  else return turnoLimpio === 'N';
-              });
-
-              if (mejorCandidato) {
-                  const nombreFinal = mejorCandidato.key || mejorCandidato.nombre;
-                  onAsignar(orden.nroOrden, idx, nombreFinal, true);
-                  tecnicosYaAsignados.push(nombreFinal);
-              }
-          }
-      });
-  };
+  // USAMOS EL HOOK
+  const { esSabado, sugerirTecnicosFaltantes, getCandidatosParaSlot } = useModalAsignacion({
+      orden,
+      fecha,
+      empleados,
+      mapaHorarios,
+      onAsignar
+  });
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
@@ -75,84 +39,52 @@ export const ModalAsignacionTecnico = ({
               <h3 className="text-xl font-black uppercase italic tracking-wider">Asignar Técnicos</h3>
               <p className="text-slate-400 text-xs font-bold mt-1">{orden.equipo} - {orden.descripcion}</p>
               <div className="mt-2 inline-flex items-center gap-2 bg-pf-red/20 text-pf-red px-3 py-1 rounded-full text-xs font-bold">
-                 <Moon size={12} /> 
-                 {esSabado 
-                   ? `Sábado ${fecha}: Disponible salvo L/V/LIC` 
-                   : `Semana ${fecha}: Requiere Turno Noche`}
+                  <Moon size={12} /> 
+                  {esSabado 
+                    ? `Sábado ${fecha}: Disponible salvo L/V/LIC` 
+                    : `Semana ${fecha}: Requiere Turno Noche`}
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X/></button>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
-             {/* Ahora los botones de agregar cupos pueden ser dinámicos según tus roles principales */}
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'M')} className="flex items-center gap-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Mecánico
-             </button>
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'E')} className="flex items-center gap-1 text-[10px] font-bold bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Eléctrico
-             </button>
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SADEMA')} className="flex items-center gap-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Sadema
-             </button>
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SUPERVISOR')} className="flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Supervisor
-             </button>
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'CALDERA')} className="flex items-center gap-1 text-[10px] font-bold bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Caldera
-             </button>
-             <button onClick={() => onModificarCupos(orden.nroOrden, 'ADD', 'SE')} className="flex items-center gap-1 text-[10px] font-bold bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg transition-colors">
-                <Plus size={12} /> Servicio Externo
-             </button>
-             
-             <button onClick={sugerirTecnicosFaltantes} className="ml-auto flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-purple-900/20">
+              {/* Botones de acción rápida */}
+              {['M', 'E', 'SADEMA', 'SUPERVISOR', 'CALDERA', 'SE'].map(rol => {
+                  const cfg = CONFIG_ROLES[rol] || { color: 'bg-slate-600', label: rol };
+                  // Ajuste rapido de colores para el botón (podrías extraer esto si quieres más precisión)
+                  let btnColor = "bg-slate-600 hover:bg-slate-500";
+                  if (rol === 'M') btnColor = "bg-blue-600 hover:bg-blue-500";
+                  if (rol === 'E') btnColor = "bg-yellow-600 hover:bg-yellow-500";
+                  if (rol === 'SADEMA') btnColor = "bg-emerald-600 hover:bg-emerald-500";
+                  if (rol === 'SUPERVISOR') btnColor = "bg-purple-600 hover:bg-purple-500";
+                  if (rol === 'CALDERA') btnColor = "bg-pink-600 hover:bg-pink-500";
+
+                  return (
+                      <button key={rol} onClick={() => onModificarCupos(orden.nroOrden, 'ADD', rol)} className={`flex items-center gap-1 text-[10px] font-bold ${btnColor} text-white px-3 py-1.5 rounded-lg transition-colors`}>
+                        <Plus size={12} /> {cfg.label}
+                      </button>
+                  );
+              })}
+              
+              <button onClick={sugerirTecnicosFaltantes} className="ml-auto flex items-center gap-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-purple-900/20">
                 <Wand2 size={12} /> Sugerir Disponibles
-             </button>
+              </button>
           </div>
         </div>
 
         <div className="p-6 overflow-y-auto space-y-6 bg-slate-50/50">
           {orden.tecnicos.map((slot: any, idx: number) => {
             
-            // --- NUEVA LÓGICA DE ETIQUETA ---
-            const mapeoRoles: Record<string, string> = {
-                'M': 'Mecánico',
-                'E': 'Eléctrico',
-                'SADEMA': 'Sadema',
-                'SUPERVISOR': 'Supervisor',
-                'CALDERA': 'Caldera',
-                'SE': 'Servicio Externo'
-            };
             const config = CONFIG_ROLES[slot.rol] || { label: slot.rol, color: 'bg-slate-500', text: 'text-slate-500' };
-
-            const candidatos = empleados.filter((emp: any) => {
-                return rolesCoinciden(slot.rol, emp.rol) && esPlantaCompatible(emp.planta, orden.planta);
-            });
-
-            const candidatosConTurno = candidatos.map(cand => {
-                const nombre = cand.key || cand.nombre || "NN";
-                const turnos = mapaHorarios.get(nombre);
-                const turnoDia = turnos ? turnos[diaIndex] : "?";
-                const turnoLimpio = String(turnoDia).trim().toUpperCase();
-
-                const esExento = !necesitaValidacionTurno(cand.rol);
-                let estaDisponible = esExento ? true : (esSabado ? !BLOQUEOS_SABADO.some(b => turnoLimpio.startsWith(b)) : turnoLimpio === 'N');
-                
-                const yaEnUso = tecnicosYaAsignados.includes(nombre) && slot.nombre !== nombre;
-                return { nombre, estaDisponible, turnoDia, yaEnUso, esExento };
-            });
-
-            candidatosConTurno.sort((a, b) => {
-                if (a.yaEnUso !== b.yaEnUso) return a.yaEnUso ? 1 : -1;
-                if (a.estaDisponible !== b.estaDisponible) return b.estaDisponible ? 1 : -1;
-                return a.nombre.localeCompare(b.nombre);
-            });
+            
+            // Obtenemos candidatos procesados desde el hook
+            const candidatosConTurno = getCandidatosParaSlot(slot.rol, slot.nombre);
 
             return (
               <div key={idx} className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm relative group/card">
                 <div className="flex justify-between mb-3 items-center border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
-                      {/* Aplicación de Color Dinámico al Texto del Rol */}
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                         Puesto {idx + 1}: <span className={config.text}>{config.label}</span>
                       </span>
@@ -161,7 +93,6 @@ export const ModalAsignacionTecnico = ({
                       </button>
                   </div>
                   <div className="flex items-center gap-2">
-                      {/* Aplicación de Color al Icono de Usuario (tu duda original) */}
                       {slot.nombre !== 'VACANTE' && (
                         <div className={`flex items-center gap-1 mr-2 ${config.text}`}>
                            <User size={12} className="fill-current" />
@@ -181,7 +112,7 @@ export const ModalAsignacionTecnico = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                  {candidatosConTurno.map((cand) => {
+                  {candidatosConTurno.map((cand: any) => {
                     const esSeleccionado = cand.nombre === slot.nombre;
                     const isDisabled = !cand.estaDisponible || cand.yaEnUso;
                     return (

@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Activity, DollarSign, Clock, Zap, History, TrendingDown, TrendingUp, Minus } from "lucide-react";
-import { KpiTile, HeaderSection } from "./FallasUI";
-import { TrendChart } from "./TrendChart"; // <--- IMPORTAMOS EL NUEVO COMPONENTE
+import { Activity, DollarSign, Clock, Zap, History } from "lucide-react";
+import { KpiTile } from "./ui/KpiTile";
+import { HeaderSection } from "./ui/HeaderSection";
+import { TrendChart } from "./TrendChart";
 import { clp, num } from "../../../shared/utils/dateUtils";
+import { ComparativeRow } from "./ComparativeRow";
 
 interface Props {
   analytics: any;
@@ -32,76 +34,6 @@ export const DashboardTab = ({
     }
   };
 
-  // --- COMPONENTE CUSTOM: FILA COMPARATIVA (Igual que antes) ---
-  const ComparativeRow = ({ item, maxValGlobal, formatFn, type, onClick, active }: any) => {
-      // ... (Misma lógica de ComparativeRow que ya tenías, no hace falta cambiarla)
-      const currentVal = type === 'FREQ' ? item.count : (type === 'COST' ? item.gasto : item.mttr);
-      const prevVal = type === 'FREQ' ? item.prevCount : (type === 'COST' ? item.prevGasto : item.prevMttr);
-      const diff = currentVal - prevVal;
-      const isBetter = diff < 0;
-      const isWorse = diff > 0;
-      const isNeutral = diff === 0;
-
-      let scaleBase = 1;
-      if (showComparison) {
-          scaleBase = Math.max(prevVal, currentVal);
-      } else {
-          scaleBase = maxValGlobal;
-      }
-      if (scaleBase === 0) scaleBase = 1;
-
-      const currentPercent = (currentVal / scaleBase) * 100;
-      const prevPercent = (prevVal / scaleBase) * 100;
-
-      let barColor = "bg-slate-400";
-      if (showComparison) {
-          if (isBetter) barColor = "bg-emerald-500";
-          if (isWorse) barColor = "bg-red-500";
-      } else {
-          if (type === 'FREQ') barColor = "bg-blue-600";
-          if (type === 'COST') barColor = "bg-pf-red";
-          if (type === 'MTTR') barColor = "bg-purple-600";
-      }
-
-      return (
-        <div 
-            onClick={onClick}
-            className={`group p-3 rounded-xl cursor-pointer transition-all duration-300 border mb-2 ${active ? 'bg-slate-50 border-slate-300 shadow-sm' : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-100'}`}
-        >
-            <div className="flex justify-between items-end mb-2">
-                <span className={`text-xs font-bold truncate max-w-[50%] ${active ? 'text-slate-900' : 'text-slate-600'}`}>
-                    {item.label}
-                </span>
-                <div className="text-right flex items-center gap-1">
-                    {showComparison && !isNeutral && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isBetter ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {isBetter ? <TrendingDown size={10}/> : <TrendingUp size={10}/>}
-                            {formatFn(Math.abs(diff))}
-                        </span>
-                    )}
-                    <span className="block text-sm font-black text-slate-800">{formatFn(currentVal)}</span>
-                </div>
-            </div>
-
-            <div className="relative w-full flex flex-col justify-center gap-1">
-                {showComparison && (
-                     <div className="flex items-center gap-1">
-                        <div className="relative h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden border border-slate-300">
-                            <div className="absolute top-0 left-0 h-full rounded-full bg-slate-400 transition-all duration-500" style={{ width: `${Math.max(prevPercent, 0)}%` }}></div>
-                        </div>
-                        <span className="text-[9px] font-medium text-slate-400 w-12 text-right">{anioFiltro - 1}</span>
-                    </div>
-                )}
-                <div className="flex items-center gap-1">
-                    <div className="relative h-2.5 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner border border-slate-300">
-                        <div className={`absolute top-0 left-0 h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${Math.max(currentPercent, 0)}%` }}></div>
-                    </div>
-                    {showComparison && <span className="text-[9px] font-bold text-slate-600 w-12 text-right">{anioFiltro}</span>}
-                </div>
-            </div>
-        </div>
-      );
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -177,6 +109,8 @@ export const DashboardTab = ({
                         type="FREQ"
                         active={filtroDrill?.valor === item.label}
                         onClick={() => handleBarClick('EQUIPO', item.label)}
+                        showComparison={showComparison}
+                        anioFiltro={anioFiltro}
                     />
                 ))}
             </div>
@@ -197,6 +131,8 @@ export const DashboardTab = ({
                         type="COST"
                         active={filtroDrill?.valor === item.label}
                         onClick={() => handleBarClick('EQUIPO', item.label)}
+                        showComparison={showComparison}
+                        anioFiltro={anioFiltro}
                     />
                 ))}
             </div>
@@ -217,6 +153,8 @@ export const DashboardTab = ({
                         type="MTTR"
                         active={filtroDrill?.valor === item.label}
                         onClick={() => handleBarClick('EQUIPO', item.label)}
+                        showComparison={showComparison}
+                        anioFiltro={anioFiltro}
                     />
                 ))}
             </div>

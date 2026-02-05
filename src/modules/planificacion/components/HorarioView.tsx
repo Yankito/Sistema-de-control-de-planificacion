@@ -1,5 +1,5 @@
 // src/components/planificacion/HorarioView.tsx
-import { HorarioTecnico } from "../../../types"; // Asegúrate que apunte a tus types
+import { HorarioTecnico } from "../types"; // Asegúrate que apunte a tus types
 import { Wrench, Zap } from "lucide-react";
 
 const COLORES_TURNOS: Record<string, string> = {

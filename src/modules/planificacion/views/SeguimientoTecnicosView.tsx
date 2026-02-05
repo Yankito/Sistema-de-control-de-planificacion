@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { PlanResult } from "../types";
 import { User, AlertTriangle, CheckCircle2, Search, X, ArrowRightCircle } from "lucide-react";
+import { useTecnicosCarga } from "../hooks/useTecnicosCarga"; // Importamos el Hook
 
 interface Props {
   planResult: PlanResult[];
@@ -9,85 +10,24 @@ interface Props {
 }
 
 export const SeguimientoTecnicosView = ({ planResult, plantas, onNavegar }: Props) => {
-  const [plantaSel, setPlantaSel] = useState("TODAS"); // CAMBIO: Iniciar en TODAS para ver datos al instante
-  const [busqueda, setBusqueda] = useState("");
-  const [celdaSeleccionada, setCeldaSeleccionada] = useState<{ nombre: string, fecha: string, ots: any[] } | null>(null);
-
-  const { datosTecnicos, diasMes } = useMemo(() => {
-    const mapaTecnicos = new Map<string, { rol: string, carga: Record<string, any[]> }>();
-    
-    // Si no hay planResult, retornamos estructuras vacías
-    if (!planResult || planResult.length === 0) return { datosTecnicos: [], diasMes: [] };
-
-    // Intentamos obtener el mes/año de la primera OT válida
-    let mes = 1, anio = 2026;
-    const primeraConFecha = planResult.find(p => p.fechaSugerida && p.fechaSugerida.includes('/'));
-    
-    if (primeraConFecha) {
-        const parts = primeraConFecha.fechaSugerida.split('/');
-        if(parts.length === 3) {
-            mes = parseInt(parts[1]);
-            anio = parseInt(parts[2]);
-        }
-    }
-
-    const ultimoDia = new Date(anio, mes, 0).getDate();
-    const dias = Array.from({ length: ultimoDia }, (_, i) => {
-        const d = (i + 1).toString().padStart(2, '0');
-        const m = mes.toString().padStart(2, '0');
-        return `${d}/${m}/${anio}`;
-    });
-
-    // Llenar mapa
-    planResult.forEach(ot => {
-        // Normalización de planta para comparación segura
-        const plantaOT = (ot.planta || "").toUpperCase().trim();
-        const plantaFiltro = plantaSel.toUpperCase().trim();
-
-        if (plantaFiltro !== "TODAS" && plantaOT !== plantaFiltro) return;
-
-        ot.tecnicos.forEach((tec: any) => {
-            if (!tec.nombre || tec.nombre === "VACANTE" || tec.nombre === "OT NUEVA" || tec.nombre === "SIN HISTORIAL") return;
-
-            if (!mapaTecnicos.has(tec.nombre)) {
-                mapaTecnicos.set(tec.nombre, { rol: tec.rol, carga: {} });
-            }
-
-            const registro = mapaTecnicos.get(tec.nombre)!;
-            // Aseguramos que la fecha sea válida
-            if (ot.fechaSugerida) {
-                if (!registro.carga[ot.fechaSugerida]) {
-                    registro.carga[ot.fechaSugerida] = [];
-                }
-                registro.carga[ot.fechaSugerida].push(ot);
-            }
-        });
-    });
-
-    // Convertir a array y ordenar
-    const lista = Array.from(mapaTecnicos.entries()).map(([nombre, data]) => ({
-        nombre,
-        rol: data.rol,
-        carga: data.carga
-    }));
-
-    return { datosTecnicos: lista.sort((a, b) => a.nombre.localeCompare(b.nombre)), diasMes: dias };
-  }, [planResult, plantaSel]);
-
-  // Filtro de búsqueda por nombre
-  const tecnicosFiltrados = datosTecnicos.filter(t => 
-      !busqueda || t.nombre.toUpperCase().includes(busqueda.toUpperCase())
-  );
+  const [plantaSel, setPlantaSel] = useState("TODAS");
+  
+  const { 
+      tecnicosFiltrados, diasMes, 
+      busqueda, setBusqueda, 
+      celdaSeleccionada, setCeldaSeleccionada,
+      totalTecnicos 
+  } = useTecnicosCarga(planResult, plantaSel);
 
   return (
     <div className="space-y-6 h-full flex flex-col animate-in fade-in">
       
-      {/* HEADER DE CONTROL */}
+      {/* HEADER */}
       <div className="bg-white p-6 rounded-3xl border border-pf-border shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div>
             <h2 className="text-xl font-black uppercase italic text-slate-900">Carga de Trabajo</h2>
             <p className="text-xs text-slate-400 font-bold">
-                {tecnicosFiltrados.length} Técnicos encontrados en {plantaSel}
+                {totalTecnicos} Técnicos encontrados en {plantaSel}
             </p>
         </div>
 
@@ -102,18 +42,14 @@ export const SeguimientoTecnicosView = ({ planResult, plantas, onNavegar }: Prop
                     onChange={(e) => setBusqueda(e.target.value)}
                 />
             </div>
-            <select 
-                value={plantaSel} 
-                onChange={(e) => setPlantaSel(e.target.value)} 
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none cursor-pointer hover:border-pf-red transition-colors"
-            >
+            <select value={plantaSel} onChange={(e) => setPlantaSel(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none cursor-pointer hover:border-pf-red transition-colors">
                 <option value="TODAS">TODAS LAS PLANTAS</option>
                 {plantas.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
         </div>
       </div>
 
-      {/* TABLA HEATMAP */}
+      {/* TABLA HEATMAP (Visualización pura) */}
       <div className="bg-white border border-pf-border rounded-[2.5rem] shadow-sm flex-1 overflow-hidden flex flex-col relative">
         <div className="overflow-auto custom-scrollbar flex-1">
             {tecnicosFiltrados.length > 0 ? (
@@ -136,7 +72,6 @@ export const SeguimientoTecnicosView = ({ planResult, plantas, onNavegar }: Prop
                     <tbody>
                         {tecnicosFiltrados.map((tec) => (
                             <tr key={tec.nombre} className="group hover:bg-slate-50/50 transition-colors">
-                                {/* COLUMNA NOMBRE FIJA */}
                                 <td className="p-4 border-r border-b border-pf-border sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg shrink-0 ${tec.rol === 'E' ? 'bg-yellow-50 text-yellow-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -148,18 +83,15 @@ export const SeguimientoTecnicosView = ({ planResult, plantas, onNavegar }: Prop
                                         </div>
                                     </div>
                                 </td>
-
-                                {/* CELDAS DE CARGA */}
                                 {diasMes.map(dia => {
                                     const trabajos = tec.carga[dia] || [];
                                     const cantidad = trabajos.length;
-                                    
                                     let bgClass = "";
                                     if (cantidad < 1) bgClass = "";
                                     else if (cantidad < 4) bgClass = "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-200"; 
                                     else if (cantidad < 6) bgClass = "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200";   
                                     else if (cantidad < 8) bgClass = "bg-red-500 text-white hover:bg-red-600 shadow-red-200";
-                                    else bgClass = "bg-red-800 text-white hover:bg-red-900 animate-pulse shadow-red-200";         
+                                    else bgClass = "bg-red-800 text-white hover:bg-red-900 animate-pulse shadow-red-200";        
 
                                     return (
                                         <td key={dia} className="p-1 border-r border-b border-slate-100 text-center h-12 relative">
@@ -181,7 +113,6 @@ export const SeguimientoTecnicosView = ({ planResult, plantas, onNavegar }: Prop
             ) : (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400">
                     <p className="text-sm font-bold">No se encontraron técnicos con carga asignada.</p>
-                    <p className="text-xs mt-1">Verifique que la planificación tenga nombres asignados (no vacantes).</p>
                 </div>
             )}
         </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ArrowRight, PlusCircle, CheckCircle2, ArrowRightCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { OTFlowResult } from "../logic/backlogAnalysis";
+import { ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { OTFlowResult } from "../../logic/backlogAnalysis";
 
 interface EvolutionGroupProps {
   title: string;
@@ -10,7 +10,7 @@ interface EvolutionGroupProps {
   sublabel: string;
 }
 
-const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: EvolutionGroupProps) => {
+export const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: EvolutionGroupProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -67,50 +67,4 @@ const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: EvolutionG
   );
 };
 
-interface EvolutionCardProps {
-  nuevas: OTFlowResult[];
-  finalizadas: OTFlowResult[];
-  conAvance: OTFlowResult[];
-  semanaActual: string;
-  semanaAnterior: string;
-}
 
-export const EvolutionDashboard = ({ nuevas, finalizadas, conAvance, semanaActual, semanaAnterior }: EvolutionCardProps) => {
-  if (!semanaAnterior) return <div className="p-4 bg-yellow-50 text-yellow-700 rounded-xl text-sm font-bold">Selecciona una semana de comparación en el filtro superior para ver la evolución.</div>;
-
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-2 mb-2">
-        <ArrowRightCircle className="text-purple-600" />
-        <h3 className="text-lg font-black uppercase text-slate-700">Flujo de OTs</h3>
-        <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-            {semanaAnterior} <ArrowRight size={10} className="inline"/> {semanaActual}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <EvolutionGroup 
-            title="Nuevas Entradas" 
-            sublabel="OTs que no existían la semana pasada"
-            data={nuevas} 
-            color="red" 
-            icon={PlusCircle} 
-        />
-        <EvolutionGroup 
-            title="Salieron / Finalizadas" 
-            sublabel="OTs que finalizaron"
-            data={finalizadas} 
-            color="green" 
-            icon={CheckCircle2} 
-        />
-        <EvolutionGroup 
-            title="Cambio de Clasificación"
-            sublabel="OTs atrasadas que cambiaron de clasificación"
-            data={conAvance} 
-            color="blue" 
-            icon={ArrowRightCircle} 
-        />
-      </div>
-    </div>
-  );
-};

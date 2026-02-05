@@ -1,16 +1,14 @@
 import { useMemo } from "react";
-import { AtrasoRow } from "../modules/seguimiento/types";
-import { PlanResult } from "../modules/planificacion/types";
-import { FallaRow } from "../modules/fallas/types";
-import { FileType } from "../shared/components/FileUploader";
-import { 
-  PlayCircle, Scale, CalendarCheck, Clock, AlertTriangle, ArrowRight, Activity, BarChart2, TrendingUp, LucideIcon
-} from "lucide-react";
+import { AtrasoRow } from "../../modules/seguimiento/types";
+import { PlanResult } from "../../modules/planificacion/types";
+import { FallaRow } from "../../modules/fallas/types";
+import { FileType } from "../components/FileUploader";
+import {  PlayCircle, Scale, CalendarCheck, Clock, AlertTriangle, ArrowRight, BarChart2 } from "lucide-react";
+import { EmptyCard } from "../components/ui/EmptyCard";
 
-// --- TIPOS ---
 interface DashboardProps {
   planResult: PlanResult[];
-  atrasosResult: AtrasoRow[];
+  seguimientoResult: AtrasoRow[];
   fallasResult: FallaRow[];
   onEjecutarPlan: (modo: 'STRICT' | 'BALANCED') => void;
   setActiveTab: (tab: string) => void;
@@ -18,40 +16,10 @@ interface DashboardProps {
   onRequestUpload: (tipo: FileType) => void; // NUEVA PROP
 }
 
-// --- SUB-COMPONENTE (Extraído para mejorar rendimiento) ---
-interface EmptyCardProps {
-    title: string;
-    icon: LucideIcon;
-    colorBase: string; 
-    colorHover: string; 
-    colorBorder: string; 
-    onClick: () => void;
-    desc: string;
-}
-
-const EmptyCard = ({ title, icon: Icon, colorBase, colorHover, colorBorder, onClick, desc }: EmptyCardProps) => (
-    <div 
-        onClick={onClick}
-        className={`
-            relative overflow-hidden rounded-3xl p-6 border-2 border-dashed border-slate-200 
-            ${colorBorder} ${colorHover} 
-            transition-all cursor-pointer group h-64 flex flex-col justify-center items-center text-center
-        `}
-    >
-        <div className={`mb-4 p-4 rounded-full bg-slate-50 group-hover:bg-white group-hover:shadow-lg transition-all ${colorBase}`}>
-            <Icon size={32} />
-        </div>
-        <h3 className="font-black text-slate-700 uppercase tracking-tight mb-2">{title}</h3>
-        <p className="text-xs text-slate-400 font-medium max-w-[200px]">{desc}</p>
-        <span className={`mt-6 text-[10px] font-bold uppercase tracking-widest ${colorBase} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1`}>
-            Subir Archivo <ArrowRight size={10} />
-        </span>
-    </div>
-);
 
 export const DashboardView = ({ 
   planResult, 
-  atrasosResult, 
+  seguimientoResult, 
   fallasResult, 
   onEjecutarPlan,
   setActiveTab,
@@ -73,14 +41,14 @@ export const DashboardView = ({
   }, [planResult, tienePlan]);
 
   // --- 2. METRICAS ATRASOS ---
-  const tieneAtrasos = atrasosResult.length > 0;
-  const statsAtrasos = useMemo(() => {
-    if (!tieneAtrasos) return null;
-    const total = atrasosResult.length;
-    const vencidas = atrasosResult.filter(a => a.estado === 'VENCIDA' || (typeof a.periodo === 'string' && a.periodo === 'S/A')).length; 
+  const tieneSeguimiento = seguimientoResult.length > 0;
+  const statsSeguimiento = useMemo(() => {
+    if (!tieneSeguimiento) return null;
+    const total = seguimientoResult.length;
+    const vencidas = seguimientoResult.filter(a => a.estado === 'VENCIDA' || (typeof a.periodo === 'string' && a.periodo === 'S/A')).length; 
     const cumplimiento = total > 0 ? Math.round(((total - vencidas) / total) * 100) : 0;
     return { total, vencidas, cumplimiento };
-  }, [atrasosResult, tieneAtrasos]);
+  }, [seguimientoResult, tieneSeguimiento]);
 
   // --- 3. METRICAS FALLAS ---
   const tieneFallas = fallasResult.length > 0;
@@ -123,7 +91,7 @@ export const DashboardView = ({
         </div>
         <div className="flex gap-2">
             <StatusPill label="Planificación" active={archivoCargado} color="green" />
-            <StatusPill label="KPI Atrasos" active={tieneAtrasos} color="blue" />
+            <StatusPill label="KPI Seguimiento" active={tieneSeguimiento} color="blue" />
             <StatusPill label="Fallas" active={tieneFallas} color="amber" />
         </div>
       </div>
@@ -157,21 +125,21 @@ export const DashboardView = ({
                 colorBase="text-pf-red" colorHover="hover:bg-pf-red/5" colorBorder="hover:border-pf-red"
                 icon={CalendarCheck} 
                 desc="Gestionar turnos y asignar OTs."
-                onClick={() => onRequestUpload('PLAN')} // <--- ACCIÓN DE RESALTAR
+                onClick={() => onRequestUpload('PLAN')}
             />
         )}
 
-        {/* --- CARD 2: ATRASOS --- */}
-        {tieneAtrasos ? (
+        {/* --- CARD 2: SEGUIMIENTO --- */}
+        {tieneSeguimiento ? (
             <div className="bg-white rounded-[2rem] border border-pf-border shadow-sm p-6 relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="flex justify-between items-start mb-6">
                     <div className="p-3 bg-blue-50 rounded-2xl text-blue-600"><Clock size={24} /></div>
-                    <button onClick={() => setActiveTab('atrasos')}><ArrowRight size={20} className="text-slate-300 hover:text-blue-600"/></button>
+                    <button onClick={() => setActiveTab('seguimiento')}><ArrowRight size={20} className="text-slate-300 hover:text-blue-600"/></button>
                 </div>
                 <h3 className="text-lg font-black text-slate-800 mb-1">KPI Backlog</h3>
                 <div className="flex items-center gap-4 mb-6">
-                    <span className="text-4xl font-black text-slate-700">{statsAtrasos?.cumplimiento}%</span>
-                    <div className="flex flex-col"><span className="text-xs font-bold text-slate-400">Total</span><span className="font-black">{statsAtrasos?.total}</span></div>
+                    <span className="text-4xl font-black text-slate-700">{statsSeguimiento?.cumplimiento}%</span>
+                    <div className="flex flex-col"><span className="text-xs font-bold text-slate-400">Total</span><span className="font-black">{statsSeguimiento?.total}</span></div>
                 </div>
              </div>
         ) : (
@@ -180,7 +148,7 @@ export const DashboardView = ({
                 colorBase="text-blue-600" colorHover="hover:bg-blue-600/5" colorBorder="hover:border-blue-600"
                 icon={BarChart2} 
                 desc="Analizar cumplimiento y desviaciones."
-                onClick={() => onRequestUpload('ATRASOS')} // <--- ACCIÓN DE RESALTAR
+                onClick={() => onRequestUpload('SEGUIMIENTO')}
             />
         )}
 
@@ -202,7 +170,7 @@ export const DashboardView = ({
                 colorBase="text-amber-500" colorHover="hover:bg-amber-500/5" colorBorder="hover:border-amber-500"
                 icon={AlertTriangle} 
                 desc="Activos críticos y tiempos de reparación."
-                onClick={() => onRequestUpload('FALLAS')} // <--- ACCIÓN DE RESALTAR
+                onClick={() => onRequestUpload('FALLAS')}
             />
         )}
 
@@ -210,42 +178,3 @@ export const DashboardView = ({
     </div>
   );
 };
-
-// --- PEQUEÑOS COMPONENTES AUXILIARES PARA LIMPIEZA VISUAL ---
-
-const StatusPill = ({ label, active, color }: { label: string, active: boolean, color: 'green' | 'blue' | 'amber' }) => {
-    // Mapeo simple de colores para Tailwind
-    const colors = {
-        green: active ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-400 border-slate-200',
-        blue: active ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-400 border-slate-200',
-        amber: active ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-400 border-slate-200',
-    };
-    const dots = {
-        green: active ? 'bg-green-500 animate-pulse' : 'bg-slate-300',
-        blue: active ? 'bg-blue-500 animate-pulse' : 'bg-slate-300',
-        amber: active ? 'bg-amber-500 animate-pulse' : 'bg-slate-300',
-    };
-
-    return (
-        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border ${colors[color]}`}>
-            <div className={`w-2 h-2 rounded-full ${dots[color]}`}></div>
-            {label}
-        </div>
-    );
-};
-
-const ActionButton = ({ label, sublabel, icon: Icon, onClick, primary }: any) => (
-    <button 
-        onClick={onClick}
-        className={`
-            py-3 rounded-xl flex flex-col items-center justify-center transition-all transform active:scale-95 cursor-pointer
-            ${primary 
-                ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-900/20' 
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
-        `}
-    >
-        <Icon size={18} className={`mb-1 ${primary ? 'text-pf-red' : ''}`} />
-        <span className="text-[9px] font-bold uppercase">{label}</span>
-        {sublabel && <span className="text-[8px] opacity-60 font-medium">{sublabel}</span>}
-    </button>
-);

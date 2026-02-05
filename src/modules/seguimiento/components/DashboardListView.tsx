@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
 import { Search, ChevronLeft, ChevronRight, TrendingUp, User, ArrowRight, Plus, Factory, CheckCircle2, X } from "lucide-react";
 import { TechStats } from "../logic/technicianAnalysis";
 import { OTFlowResult, BacklogStats } from "../logic/backlogAnalysis";
+import { useDashboardList } from "../hooks/useDashboardList";
 
 interface DashboardListViewProps {
   onClose: () => void;
@@ -23,49 +23,15 @@ export const DashboardListView = ({
   onSelectTech
 }: DashboardListViewProps) => {
   
-  const [activeTab, setActiveTab] = useState<"FLOW" | "TECNICOS">("FLOW");
-  const [subTabFlow, setSubTabFlow] = useState<"NUEVAS" | "CAMBIOS" | "FINALIZADAS">("NUEVAS");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterPlanta, setFilterPlanta] = useState("TODAS");
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 50;
-
-  // Reset página al cambiar filtros
-  useEffect(() => { setPage(1); }, [activeTab, subTabFlow, filterPlanta, searchTerm]);
-
-  // Filtrado de Lista
-  const listToDisplay = useMemo(() => {
-    let list: any[] = [];
-    
-    if (activeTab === "FLOW") {
-        if (subTabFlow === "NUEVAS") list = flowStats.nuevas;
-        else if (subTabFlow === "CAMBIOS") list = flowStats.conAvance;
-        else list = flowStats.finalizadas;
-    } else {
-        list = techStats;
-    }
-
-    return list.filter(item => {
-        // Determinar planta del item (TechStats tiene array, OTFlow tiene string)
-        const matchPlanta = filterPlanta === "TODAS" || (
-            activeTab === "TECNICOS" 
-            ? (item as TechStats).plantas.includes(filterPlanta) 
-            : item.planta === filterPlanta
-        );
-
-        const term = searchTerm.toLowerCase();
-        const matchSearch = !term || (
-            'ot' in item 
-            ? (item.ot.toLowerCase().includes(term) || item.descripcion.toLowerCase().includes(term)) 
-            : item.nombre.toLowerCase().includes(term)
-        );
-        
-        return matchPlanta && matchSearch;
-    });
-  }, [activeTab, subTabFlow, flowStats, techStats, filterPlanta, searchTerm]);
-
-  const totalPages = Math.ceil(listToDisplay.length / itemsPerPage);
-  const paginatedList = listToDisplay.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const {
+        activeTab, setActiveTab,
+        subTabFlow, setSubTabFlow,
+        searchTerm, setSearchTerm,
+        filterPlanta, setFilterPlanta,
+        page, setPage,
+        paginatedList,
+        totalPages
+    } = useDashboardList(flowStats, techStats);
 
   return (
     <div className="flex flex-col h-full bg-white">

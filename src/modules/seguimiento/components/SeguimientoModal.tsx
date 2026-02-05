@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
 import { X, Search, ChevronLeft, ChevronRight, Filter, Sparkles } from "lucide-react";
 import { AtrasoRow } from "../types";
 import { EmployeeProfile } from "./EmployeeProfile";
 import { OTCard } from "./OTCard";
-import { filterOrders, normalizeOT } from "../logic/filterUtils"; // IMPORTAR UTILS
+import { normalizeOT } from "../logic/filterUtils";
+// IMPORTAMOS EL HOOK
+import { useSeguimientoModal } from "../hooks/useSeguimientoModal";
 
 interface SeguimientoModalProps {
   viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean };
@@ -22,69 +23,28 @@ export const SeguimientoModal = ({
   LISTA_PLANTAS_INDIVIDUALES, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, modoVista
 }: SeguimientoModalProps) => {
   
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterEstado, setFilterEstado] = useState("TODOS");
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS" });
-  const [pagina, setPagina] = useState(1);
-  const itemsPorPagina = 10;
-
-  // 1. CREAR SET NORMALIZADO (Solo una vez cuando cambie dataAnterior)
-  const previousOtSet = useMemo(() => {
-      return new Set(dataAnterior.map(d => normalizeOT(d.ot)));
-  }, [dataAnterior]);
-
-  // 2. FILTRADO OPTIMIZADO USANDO UTIL
-  const { filteredGeneral, estadosDisponibles } = useMemo(() => {
-      // Llamamos a la lógica extraída
-      const { filteredData, baseDataForStates } = filterOrders(
-          dataModo,
-          { viewDetail, filterEstado, searchTerm },
-          { plantasComplejo: PLANTAS_COMPLEJO, plantasPfAlimentos: PLANTAS_PF_ALIMENTOS, previousOtSet }
-      );
-
-      // Calculamos estados disponibles basados en la data base (sin filtrar por texto/estado)
-      const estados = new Set(baseDataForStates.map(d => d.estado));
-      const lista = ["TODOS"];
-      if (dataAnterior.length > 0) lista.push("NUEVAS");
-      
-      return { 
-          filteredGeneral: filteredData, 
-          estadosDisponibles: [...lista, ...Array.from(estados).sort()] 
-      };
-
-  }, [dataModo, viewDetail, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, filterEstado, searchTerm, previousOtSet, dataAnterior.length]);
-
-  const datosPaginados = useMemo(() => filteredGeneral.slice((pagina - 1) * itemsPorPagina, pagina * itemsPorPagina), [filteredGeneral, pagina]);
-  const totalPaginas = Math.ceil(filteredGeneral.length / itemsPorPagina);
-
-  // 3. LOGICA EMPLEADO (Mantenemos local o movemos a utils si crece más)
-  const employeeData = useMemo(() => {
-    if (!selectedEmployee) return { orders: [], stats: { total: 0, cumplidas: 0, pendientes: 0 } };
-    
-    let orders = dataModo.filter(d => d.detallesTecnicos?.some(t => t.tecnico === selectedEmployee));
-    
-    if (empFilters.planta !== "TODAS") orders = orders.filter(d => d.planta === empFilters.planta);
-    if (empFilters.periodo !== "TODOS") orders = orders.filter(d => d.periodo === empFilters.periodo);
-    
-    const ordersWithFlag = orders.map(o => ({
-        ...o,
-        isNew: dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(o.ot))
-    }));
-
-    return { 
-        orders: ordersWithFlag, 
-        stats: { 
-            total: orders.length, 
-            cumplidas: orders.filter(o => o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada).length, 
-            pendientes: orders.filter(o => o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada === false).length 
-        } 
-    };
-  }, [selectedEmployee, dataModo, empFilters, previousOtSet, dataAnterior]);
+  // 1. USAMOS EL HOOK (Toda la lógica compleja está aquí dentro)
+  const {
+      searchTerm, handleSearchChange,
+      filterEstado, handleFilterChange,
+      pagina, setPagina,
+      totalPaginas, datosPaginados, totalItems, estadosDisponibles, previousOtSet,
+      selectedEmployee, setSelectedEmployee,
+      empFilters, setEmpFilters,
+      employeeData, resetEmployee
+  } = useSeguimientoModal({
+      dataModo,
+      dataAnterior,
+      viewDetail,
+      PLANTAS_COMPLEJO,
+      PLANTAS_PF_ALIMENTOS
+  });
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end animate-in fade-in duration-200">
       <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        
+        {/* VISTA 1: PERFIL DE EMPLEADO */}
         {selectedEmployee ? (
           <EmployeeProfile 
             employeeName={selectedEmployee} 
@@ -93,9 +53,10 @@ export const SeguimientoModal = ({
             filters={empFilters} 
             setFilters={setEmpFilters} 
             listaPlantas={LISTA_PLANTAS_INDIVIDUALES} 
-            onBack={() => { setSelectedEmployee(null); setEmpFilters({planta:"TODAS", periodo:"TODOS"}); }}
+            onBack={resetEmployee}
           />
         ) : (
+          /* VISTA 2: LISTADO GENERAL */
           <>
             <div className="p-6 border-b bg-white">
               <div className="flex justify-between items-center mb-4">
@@ -105,7 +66,7 @@ export const SeguimientoModal = ({
                         <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">{viewDetail.cat || (modoVista === "CUMPLIDAS" ? 'CUMPLIDAS' : 'GLOBAL')}</span>
                         <span className="text-xs text-slate-400">Semana: {selectedSemana}</span>
                         <span className="text-xs text-slate-300">|</span>
-                        <span className="text-xs font-bold text-slate-600">{filteredGeneral.length} OTs</span>
+                        <span className="text-xs font-bold text-slate-600">{totalItems} OTs</span>
                     </div>
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X/></button>
@@ -113,19 +74,13 @@ export const SeguimientoModal = ({
               
               <div className="flex gap-2">
                   <div className="relative min-w-[140px]">
-                      {filterEstado === "NUEVAS" ? (
-                          <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={14} />
-                      ) : (
-                          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                      )}
+                      {filterEstado === "NUEVAS" ? <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={14} /> : <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />}
                       <select 
                         value={filterEstado}
-                        onChange={(e) => { setFilterEstado(e.target.value); setPagina(1); }}
+                        onChange={(e) => handleFilterChange(e.target.value)}
                         className={`w-full pl-9 pr-2 py-2 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-blue-200 cursor-pointer appearance-none ${filterEstado === 'NUEVAS' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-700'}`}
                       >
-                          {estadosDisponibles.map(est => (
-                              <option key={est} value={est}>{est}</option>
-                          ))}
+                          {estadosDisponibles.map(est => <option key={est} value={est}>{est}</option>)}
                       </select>
                   </div>
 
@@ -136,7 +91,7 @@ export const SeguimientoModal = ({
                         placeholder="Buscar OT, Descrip. o Técnico..." 
                         className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-xl text-sm outline-none border border-transparent focus:border-blue-200 transition-all" 
                         value={searchTerm} 
-                        onChange={(e) => { setSearchTerm(e.target.value); setPagina(1); }}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                       />
                   </div>
               </div>
@@ -146,7 +101,6 @@ export const SeguimientoModal = ({
                 {datosPaginados.length > 0 ? (
                     datosPaginados.map((item, idx) => {
                         const isItemNew = dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(item.ot));
-                        
                         return (
                             <OTCard 
                                 key={idx} 

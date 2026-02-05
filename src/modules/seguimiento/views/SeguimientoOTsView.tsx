@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { AtrasoRow } from "../types";
-import { BarChart3, PieChart, Factory } from "lucide-react"; // Añade PieChart y Factory si faltaban
+import { BarChart3, PieChart, Factory } from "lucide-react";
 import { ResumenTable } from "../components/ResumenTable";
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { DatabaseService } from "../../../shared/db/DatabaseService";
@@ -12,76 +12,61 @@ import { SeguimientoHeader } from "../components/SeguimientoHeader";
 import { ComplianceCard } from "../components/ComplianceCard";
 import { SeguimientoModal } from "../components/SeguimientoModal";
 import { AnalysisDashboard } from "../components/AnalysisDashboard";
-import { EvolutionDashboard } from "../components/EvolutionCard";
+import { EvolutionDashboard } from "../components/EvolutionDashboard";
 import { LoadingOverlay } from "../../../shared/components/ui/LoadingOverlay"; 
 import { analyzeBacklogFlow } from "../logic/backlogAnalysis";
 
-// IMPORTAR EL NUEVO HOOK
+// IMPORTAR EL NUEVO HOOK (Solo para tipado, no para ejecutar)
 import { useSeguimientoData } from "../hooks/useSeguimientoData";
 
-export const SeguimientoOTsView = ({ 
-    data, 
-    dataAnterior = [],
-    historialCompleto = [], 
-    onCargarSemana,
-    onCambioComparacion,
-    onReporteEliminado,
-    currentCumplimiento = []
-}: { 
-    data: AtrasoRow[], 
-    dataAnterior?: AtrasoRow[],
-    historialCompleto?: string[], 
-    onCargarSemana?: (s: string) => void,
-    onCambioComparacion?: (nuevaDataAnterior: AtrasoRow[]) => void,
-    onReporteEliminado?: () => void,
-    currentCumplimiento?: AtrasoRow[]
-}) => {
-    // 1. ESTADO DE UI
-    const [modoVista, setModoVista] = useState<"ATRASOS" | "CUMPLIDAS">("ATRASOS");
-    const [showAnalysis, setShowAnalysis] = useState(false);
-    const [selectedYear, setSelectedYear] = useState<string>("TODOS"); 
-    const [selectedSemana, setSelectedSemana] = useState("TODAS");
-    const [viewDetail, setViewDetail] = useState<{ id: string, esOB: boolean, cat?: string, isGlobal?: boolean } | null>(null);
+interface Props {
+    seguimientoData: ReturnType<typeof useSeguimientoData>; // Tipado automático del hook
+    historialCompleto: string[];
+    onReporteEliminado?: () => void;
+}
 
-    // 2. HOOK DE DATOS (Reemplaza toda la lógica de fetch y useState manual)
+export const SeguimientoOTsView = ({ 
+    seguimientoData,
+    historialCompleto,
+    onReporteEliminado
+}: Props) => {
+    
+    // 1. DESESTRUCTURACIÓN DE PROPS (Datos vienen del padre)
     const {
         dataActual,
-        dataAnterior: localDataAnterior,
+        dataAnterior, // Ya viene como 'dataAnterior', no necesitamos renombrar si el hook lo expone así
         dataCumplimiento,
         reporteActual,
         semanaComparar,
         isLoading,
         cargarReporte,
         cambiarComparacion,
-        limpiarComparacion,
-        setReporteActual // Para inicialización
-    } = useSeguimientoData(
-        data, 
-        dataAnterior, 
-        currentCumplimiento, 
-        historialCompleto,
-        { onCargarSemana, onCambioComparacion }
-    );
+        limpiarComparacion
+    } = seguimientoData;
 
-    // Constantes de Plantas
+    // 2. ESTADOS VISUALES (Locales)
+    const [modoVista, setModoVista] = useState<"ATRASOS" | "CUMPLIDAS">("ATRASOS");
+    const [showAnalysis, setShowAnalysis] = useState(false);
+    const [selectedYear, setSelectedYear] = useState<string>("TODOS"); 
+    const [selectedSemana, setSelectedSemana] = useState("TODAS");
+    const [viewDetail, setViewDetail] = useState<{ id: string, esOB: boolean, cat?: string, isGlobal?: boolean } | null>(null);
+
+    // 3. CONSTANTES Y MEMOS
     const PLANTAS_COMPLEJO = useMemo(() => ["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "DC", "VENTAS"], []);
     const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", "MPS", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
     const LISTA_PLANTAS_INDIVIDUALES = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS", "DC", "VENTAS"], []);
     const LISTA_CUMPLIMIENTO = useMemo(() => LISTA_PLANTAS_INDIVIDUALES, [LISTA_PLANTAS_INDIVIDUALES]);
 
-    // Carga Inicial (Lógica simplificada gracias al hook)
+    // Lógica de carga inicial simplificada:
+    // Si no hay reporte cargado pero hay historial, cargamos el primero.
+    // Esto es un "fail-safe", idealmente el padre ya cargó algo.
     useEffect(() => {
-         if (historialCompleto.length > 0 && !reporteActual) {
+         if (!reporteActual && historialCompleto.length > 0 && !isLoading) {
              cargarReporte(historialCompleto[0]);
-         } else if (historialCompleto.length > 0 && reporteActual && !historialCompleto.includes(reporteActual)) {
-             cargarReporte(historialCompleto[0]);
-         } else if (data.length > 0 && !reporteActual) {
-            // Caso donde data viene por props iniciales y tiene semana
-            setReporteActual(data[0].semana);
          }
-    }, [historialCompleto, cargarReporte, data]); // quitamos reporteActual del array para evitar loops, o lo manejamos con cuidado
+    }, [historialCompleto, reporteActual, isLoading, cargarReporte]);
 
-    // --- LÓGICA DE FILTRADO VISUAL (Se mantiene igual) ---
+    // --- LÓGICA DE FILTRADO VISUAL ---
     const filtrarDataset = (dataset: AtrasoRow[], aplicarFiltroModo: boolean) => {
         return dataset.filter(d => {
             if (selectedYear !== "TODOS" && !d.semana.startsWith(selectedYear)) return false;
@@ -98,9 +83,9 @@ export const SeguimientoOTsView = ({
     const dataDashboard = useMemo(() => filtrarDataset(dataActual, false), [dataActual, selectedYear, selectedSemana]);
     
     const dataAnteriorFiltrada = useMemo(() => {
-        if (!semanaComparar || localDataAnterior.length === 0) return [];
-        return filtrarDataset(localDataAnterior, true);
-    }, [localDataAnterior, selectedYear, selectedSemana, modoVista, semanaComparar]);
+        if (!semanaComparar || dataAnterior.length === 0) return [];
+        return filtrarDataset(dataAnterior, true);
+    }, [dataAnterior, selectedYear, selectedSemana, modoVista, semanaComparar]);
 
     const statsEvolucion = useMemo(() => {
         if (isLoading) return null;
@@ -112,7 +97,7 @@ export const SeguimientoOTsView = ({
     const handleEliminarReporte = async () => {
         if (!semanaComparar) return;
         if (await confirm(`¿Eliminar reporte: ${semanaComparar}?`, { title: 'Confirmar', kind: 'warning' })) {
-            await DatabaseService.deleteSnapshot(semanaComparar, 'ATRASOS');
+            await DatabaseService.deleteSnapshot(semanaComparar, 'SEGUIMIENTO');
             await DatabaseService.deleteSnapshot(semanaComparar, 'CUMPLIMIENTO'); 
             limpiarComparacion();
             if (onReporteEliminado) onReporteEliminado();
@@ -120,9 +105,10 @@ export const SeguimientoOTsView = ({
     };
 
     const handleExportarExcelCompleto = async () => {
-        await exportarReporteCompleto(dataActual, localDataAnterior, modoVista, reporteActual);
+        await exportarReporteCompleto(dataActual, dataAnterior, modoVista, reporteActual);
     };
 
+    // Opciones para filtros internos
     const yearsInRows = useMemo(() => ["TODOS", ...Array.from(new Set(dataActual.map(d => d.semana.split('-')[0]))).sort().reverse()], [dataActual]);
     const semanasInRows = useMemo(() => {
         const filas = selectedYear === "TODOS" ? dataActual : dataActual.filter(d => d.semana.startsWith(selectedYear));
@@ -138,7 +124,7 @@ export const SeguimientoOTsView = ({
                     elementId="dashboard-atrasos-container"
                     fileName={`Seguimiento_${modoVista}_${reporteActual}`}
                     plantaSeleccionada="PF ALIMENTOS (CONSOLIDADO)"
-                    rangoTexto={reporteActual} // Ej: 2026-S05
+                    rangoTexto={reporteActual} 
                     semana={reporteActual.split('-')[1] || reporteActual}
                     reportTitle={modoVista === "ATRASOS" ? "Tablero de Atrasos" : "Tablero de Cumplimiento"}
                 />
@@ -164,7 +150,6 @@ export const SeguimientoOTsView = ({
             />
 
             <div id="dashboard-atrasos-container" className="p-2 bg-slate-50/50"> 
-                {/* Nota: Agregué bg-slate-50/50 para que al exportar tenga fondo, o usa bg-white */}
             {modoVista === "ATRASOS" ? (
                 <>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 animate-in fade-in duration-500">
@@ -220,12 +205,30 @@ export const SeguimientoOTsView = ({
                 </>
             ) : (
                 <div className="animate-in zoom-in-95 duration-300">
-                    <div className="flex items-center gap-2 mb-6"><PieChart className="text-green-600" /><h3 className="text-lg font-black uppercase text-slate-700">Tablero de Cumplimiento</h3><span className="text-sm font-bold text-slate-400">({selectedSemana === "TODAS" ? "Consolidado" : selectedSemana})</span></div>
-                    <div className="mb-10"><h4 className="text-sm font-black text-slate-500 mb-4 uppercase border-b pb-2">Mantención (OM)</h4><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{LISTA_CUMPLIMIENTO.map(p => (<ComplianceCard key={`om-${p}`} planta={p} esOB={false} dataSemanaActual={dataDashboard} onClick={() => setViewDetail({ id: p, esOB: false })} />))}</div></div>
-                    <div><h4 className="text-sm font-black text-slate-500 mb-4 uppercase border-b pb-2">Infraestructura (OB)</h4><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{LISTA_CUMPLIMIENTO.map(p => (<ComplianceCard key={`ob-${p}`} planta={p} esOB={true} dataSemanaActual={dataDashboard} onClick={() => setViewDetail({ id: p, esOB: true })} />))}</div></div>
+                    <div className="flex items-center gap-2 mb-6">
+                        <PieChart className="text-green-600" />
+                        <h3 className="text-lg font-black uppercase text-slate-700">Tablero de Cumplimiento</h3>
+                        <span className="text-sm font-bold text-slate-400">({selectedSemana === "TODAS" ? "Consolidado" : selectedSemana})</span>
+                    </div>
+                    <div className="mb-10">
+                        <h4 className="text-sm font-black text-slate-500 mb-4 uppercase border-b pb-2">Mantención (OM)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {LISTA_CUMPLIMIENTO.map(p => (
+                                <ComplianceCard key={`om-${p}`} planta={p} esOB={false} dataSemanaActual={dataDashboard} onClick={() => setViewDetail({ id: p, esOB: false })} />
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-black text-slate-500 mb-4 uppercase border-b pb-2">Infraestructura (OB)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {LISTA_CUMPLIMIENTO.map(p => (
+                                <ComplianceCard key={`ob-${p}`} planta={p} esOB={true} dataSemanaActual={dataDashboard} onClick={() => setViewDetail({ id: p, esOB: true })} />
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
-            </div> {/* FIN DEL CONTENEDOR ID */}
+            </div>
 
             <AnalysisDashboard 
                 isOpen={showAnalysis}

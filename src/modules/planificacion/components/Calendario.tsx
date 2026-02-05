@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import { Moon, CheckCircle2, UserX, Users } from "lucide-react";
+import { useCalendarioGrid } from "../hooks/useCalendarioGrid"; // Importamos el Hook
 
 interface CalendarioProps {
   planResult: any[];
@@ -16,22 +16,10 @@ interface CalendarioProps {
   showSuccess: boolean;
   dragOverDate: string | null;
   ordenesPorDia: any;
-  // NUEVAS PROPS
   mostrarSoloVacantes: boolean;
   setMostrarSoloVacantes: (v: boolean) => void;
   mensajeExito?: string;
 }
-
-const getWeekNumber = (d: Date) => {
-  const inicioSemana1 = new Date(2026, 0, 5); 
-  const fechaActual = new Date(d);
-  fechaActual.setHours(0, 0, 0, 0);
-  inicioSemana1.setHours(0, 0, 0, 0);
-  const diffTime = fechaActual.getTime() - inicioSemana1.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return 0;
-  return Math.floor(diffDays / 7) + 1;
-};
 
 export const Calendario = ({
   planResult,
@@ -48,63 +36,15 @@ export const Calendario = ({
   showSuccess,
   dragOverDate,
   ordenesPorDia,
-  mostrarSoloVacantes,    // Recibimos prop
-  setMostrarSoloVacantes,  // Recibimos prop
+  mostrarSoloVacantes,
+  setMostrarSoloVacantes,
   mensajeExito = "Planificación Actualizada"
 }: CalendarioProps) => {
 
-  // Eliminamos el useState local: const [mostrarSoloVacantes, setMostrarSoloVacantes] = useState(false);
-
-  const { semanas, nombreMes, totalOrdenesMes, anioActual } = useMemo(() => {
-    const base = planResult[0]?.fechaSugerida || "01/02/2026"; 
-    const [, mes, anio] = base.split('/').map(Number);
-    const primerDia = new Date(anio, mes - 1, 1);
-    const ultimoDia = new Date(anio, mes, 0).getDate();
-    const nombreMes = primerDia.toLocaleString('es-ES', { month: 'long' });
-    
-    let startIdx = primerDia.getDay() - 1;
-    if (startIdx === -1) startIdx = 6;
-
-    const diasArray = [
-      ...Array(startIdx).fill(null),
-      ...Array.from({ length: ultimoDia }, (_, i) => {
-        const d = (i + 1).toString().padStart(2, '0');
-        const m = mes.toString().padStart(2, '0');
-        return `${d}/${m}/${anio}`;
-      })
-    ];
-
-    const semanasArr = [];
-    let totalMes = 0;
-
-    for (let i = 0; i < diasArray.length; i += 7) {
-      const chunk = diasArray.slice(i, i + 7);
-      const fechaRefStr = chunk.find(d => d !== null);
-      let numSemana = 0;
-      if (fechaRefStr) {
-        const [d, m, y] = fechaRefStr.split('/').map(Number);
-        numSemana = getWeekNumber(new Date(y, m - 1, d));
-      }
-      chunk.forEach(fecha => {
-        if (fecha && ordenesPorDia[fecha]) totalMes += ordenesPorDia[fecha].length;
-      });
-      semanasArr.push({
-        numero: numSemana,
-        dias: chunk,
-        idSemana: `WEEK-${numSemana}`
-      });
-    }
-
-    return { 
-      semanas: semanasArr, 
-      nombreMes: nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1), 
-      totalOrdenesMes: totalMes, 
-      anioActual: anio 
-    };
-  }, [planResult, ordenesPorDia]);
+  // USAMOS EL HOOK (Lógica de Fechas extraída)
+  const { semanas, nombreMes, totalOrdenesMes, anioActual } = useCalendarioGrid(planResult, ordenesPorDia);
 
   return (
-    
     <div className="flex-1 space-y-6 relative">
       {/* Notificación Dinámica */}
       {showSuccess && (

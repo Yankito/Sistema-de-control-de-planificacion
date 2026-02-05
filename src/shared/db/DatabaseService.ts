@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import { AtrasoRow, ActivoRow, MasivoRow, CumplimientoRow } from "../../types";
+import { AtrasoRow, ActivoRow, MasivoRow, CumplimientoRow } from "../../modules/seguimiento/types";
 
 const DB_NAME = "sqlite:pf_seguimiento.db";
 
@@ -15,7 +15,7 @@ export class DatabaseService {
         CREATE TABLE IF NOT EXISTS snapshots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           semana TEXT NOT NULL,
-          tipo TEXT CHECK( tipo IN ('ATRASOS', 'CUMPLIMIENTO', 'MASIVO_RAW', 'CUMPLIMIENTO_RAW') ) NOT NULL,
+          tipo TEXT CHECK( tipo IN ('SEGUIMIENTO', 'CUMPLIMIENTO', 'MASIVO_RAW', 'CUMPLIMIENTO_RAW') ) NOT NULL,
           fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(semana, tipo)
         );
@@ -85,7 +85,7 @@ export class DatabaseService {
     await db.execute("DELETE FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
   }
 
-  // --- GUARDAR REPORTE PROCESADO (ATRASOS) ---
+  // --- GUARDAR REPORTE PROCESADO ---
   static async guardarSnapshot(semana: string, tipo: string, data: AtrasoRow[]) {
     const db = await this.init();
     // 1. Upsert Snapshot
@@ -186,7 +186,7 @@ export class DatabaseService {
     }));
   }
 
-  static async getLatestSnapshot(tipo: 'ATRASOS' | 'CUMPLIMIENTO'): Promise<AtrasoRow[]> {
+  static async getLatestSnapshot(tipo: 'SEGUIMIENTO' | 'CUMPLIMIENTO'): Promise<AtrasoRow[]> {
     const db = await this.init();
     const snapshot = await db.select<any[]>("SELECT id, semana FROM snapshots WHERE tipo = $1 ORDER BY id DESC LIMIT 1", [tipo]);
     if (snapshot.length === 0) return [];

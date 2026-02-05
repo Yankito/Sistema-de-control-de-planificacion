@@ -57,7 +57,7 @@ export interface CumplimientoRow {
   empleado: string;
   nro_ot: string;
   tipo: string;
-  estado_om: string; // El dato clave
+  estado_om: string;
   fecha_programada: string;
   op_finalizada: string;
 }
