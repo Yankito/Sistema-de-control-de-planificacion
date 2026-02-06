@@ -92,3 +92,23 @@ export const getRangoSemana = (semana: number, anio: number) => {
   
   return `${fmt(inicioSemanaTarget)} - ${fmt(finSemanaTarget)}`;
 };
+
+export const getRangeFromWeekID = (weekID: string): string => {
+    if (!weekID || weekID === "TODAS") return "";
+    
+    const [yearStr, weekStr] = weekID.split("-S");
+    const year = parseInt(yearStr);
+    const week = parseInt(weekStr);
+
+    // Encontrar el primer jueves del año (estándar ISO)
+    const firstThursday = new Date(year, 0, 1);
+    while (firstThursday.getDay() !== 4) {
+        firstThursday.setDate(firstThursday.getDate() + 1);
+    }
+
+    // Calcular el lunes de la semana buscada
+    const targetMonday = new Date(firstThursday.valueOf());
+    targetMonday.setDate(targetMonday.getDate() - 3 + (week - 1) * 7);
+
+    return getWeekRange(targetMonday);
+};

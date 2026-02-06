@@ -6,7 +6,7 @@ import { filterOrders, normalizeOT } from "../logic/filterUtils";
 interface UseSeguimientoModalProps {
     dataModo: AtrasoRow[];
     dataAnterior: AtrasoRow[];
-    viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean };
+    viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean; periodo?: string };
     PLANTAS_COMPLEJO: string[];
     PLANTAS_PF_ALIMENTOS: string[];
 }
@@ -27,7 +27,18 @@ export const useSeguimientoModal = ({
 
     // Estados de Empleado
     const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-    const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS" });
+    const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS", cumplimiento: "TODOS" });
+    const [empSearch, setEmpSearch] = useState("");
+    
+    const handleSelectEmployee = (name: string) => {
+        setSelectedEmployee(name);
+        setEmpFilters({
+            // Si el modal está filtrado por una planta individual, la seteamos, si no "TODAS"
+            planta: !viewDetail.isGlobal ? viewDetail.id : "TODAS",
+            periodo: viewDetail.periodo || "TODOS",
+            cumplimiento: "TODOS"
+        });
+    };
 
     // 1. Set Normalizado (Memoizado)
     const previousOtSet = useMemo(() => {
@@ -61,31 +72,54 @@ export const useSeguimientoModal = ({
 
     // 4. Lógica de Datos del Empleado Seleccionado
     const employeeData = useMemo(() => {
-        if (!selectedEmployee) return { orders: [], stats: { total: 0, cumplidas: 0, pendientes: 0 } };
+        if (!selectedEmployee) return { orders: [], stats: { total: 0, cumplidas: 0, pendientes: 0 }, activePlants: [], activePeriods: [] };
         
-        let orders = dataModo.filter(d => d.detallesTecnicos?.some(t => t.tecnico === selectedEmployee));
+        const baseOrders = dataModo.filter(d => d.detallesTecnicos?.some(t => t.tecnico === selectedEmployee));
         
-        if (empFilters.planta !== "TODAS") orders = orders.filter(d => d.planta === empFilters.planta);
-        if (empFilters.periodo !== "TODOS") orders = orders.filter(d => d.periodo === empFilters.periodo);
-        
-        const ordersWithFlag = orders.map(o => ({
-            ...o,
-            isNew: dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(o.ot))
-        }));
+        // 1. STATS (Solo planta y periodo)
+        let statsOrders = [...baseOrders];
+        if (empFilters.planta !== "TODAS") statsOrders = statsOrders.filter(d => d.planta === empFilters.planta);
+        if (empFilters.periodo !== "TODOS") statsOrders = statsOrders.filter(d => d.periodo === empFilters.periodo);
 
-        const total = orders.length;
-        const cumplidas = orders.filter(o => o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada).length;
+        const total = statsOrders.length;
+        const cumplidas = statsOrders.filter(o => o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada).length;
+
+        // 2. LISTA VISUAL (Planta + Periodo + Cumplimiento + BUSCADOR)
+        let listOrders = [...statsOrders];
+        
+        if (empFilters.cumplimiento !== "TODOS") {
+            const buscarCumplimiento = empFilters.cumplimiento === "CUMPLIDAS";
+            listOrders = listOrders.filter(o => 
+                o.detallesTecnicos?.find(t => t.tecnico === selectedEmployee)?.finalizada === buscarCumplimiento
+            );
+        }
+
+        if (empSearch) {
+            const term = empSearch.toLowerCase();
+            listOrders = listOrders.filter(o => 
+                o.ot.toLowerCase().includes(term) || 
+                o.descripcion.toLowerCase().includes(term)
+            );
+        }
+
+        const activePlants = Array.from(new Set(baseOrders.map(o => o.planta))).sort();
+        const activePeriods = Array.from(new Set(baseOrders.map(o => o.periodo))).sort();
 
         return { 
-            orders: ordersWithFlag, 
-            stats: { total, cumplidas, pendientes: total - cumplidas } 
+            orders: listOrders.map(o => ({
+                ...o,
+                isNew: dataAnterior.length > 0 && !previousOtSet.has(normalizeOT(o.ot))
+            })), 
+            stats: { total, cumplidas, pendientes: total - cumplidas },
+            activePlants,
+            activePeriods
         };
-    }, [selectedEmployee, dataModo, empFilters, previousOtSet, dataAnterior]);
+    }, [selectedEmployee, dataModo, empFilters, empSearch, previousOtSet, dataAnterior]);
 
     // Helpers de Reset
     const handleSearchChange = (val: string) => { setSearchTerm(val); setPagina(1); };
     const handleFilterChange = (val: string) => { setFilterEstado(val); setPagina(1); };
-    const resetEmployee = () => { setSelectedEmployee(null); setEmpFilters({planta:"TODAS", periodo:"TODOS"}); };
+    const resetEmployee = () => { setSelectedEmployee(null); };
 
     return {
         // Estado UI General
@@ -97,11 +131,12 @@ export const useSeguimientoModal = ({
         totalItems: filteredGeneral.length,
         estadosDisponibles,
         previousOtSet, // Por si se necesita fuera
+        empSearch, setEmpSearch,
 
         // Estado Empleado
-        selectedEmployee, setSelectedEmployee,
+        selectedEmployee, handleSelectEmployee,
         empFilters, setEmpFilters,
         employeeData,
-        resetEmployee
+        resetEmployee,
     };
 };

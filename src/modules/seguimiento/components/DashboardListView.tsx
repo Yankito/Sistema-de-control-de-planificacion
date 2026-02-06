@@ -10,7 +10,7 @@ interface DashboardListViewProps {
   techStats: TechStats[];
   plantasDisponibles: string[];
   onSelectOT: (item: OTFlowResult) => void;
-  onSelectTech: (item: TechStats) => void;
+  onSelectTech: (item: TechStats, currentPlanta: string) => void;
 }
 
 export const DashboardListView = ({
@@ -95,7 +95,7 @@ export const DashboardListView = ({
                             {item.tipoMovimiento === 'FINALIZADA' && <div className="text-[9px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">{item.estadoActual}</div>}
                         </div>
                     ) : (
-                        <div key={item.nombre} onClick={() => onSelectTech(item)} className="bg-white p-3 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group">
+                        <div key={item.nombre} onClick={() => onSelectTech(item, filterPlanta)} className="bg-white p-3 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group">
                             <div className="flex items-center gap-3 flex-1">
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${item.efectividad === 100 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'} group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors`}>{item.nombre.substring(0, 2)}</div>
                                 <div className="flex-1 min-w-0">

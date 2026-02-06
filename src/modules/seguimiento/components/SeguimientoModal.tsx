@@ -7,7 +7,7 @@ import { normalizeOT } from "../logic/filterUtils";
 import { useSeguimientoModal } from "../hooks/useSeguimientoModal";
 
 interface SeguimientoModalProps {
-  viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean };
+  viewDetail: { id: string; esOB: boolean; cat?: string; isGlobal?: boolean; periodo?: string };
   onClose: () => void;
   dataModo: AtrasoRow[]; 
   dataAnterior?: AtrasoRow[]; 
@@ -20,7 +20,7 @@ interface SeguimientoModalProps {
 
 export const SeguimientoModal = ({
   viewDetail, onClose, dataModo, dataAnterior = [], selectedSemana,
-  LISTA_PLANTAS_INDIVIDUALES, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, modoVista
+  PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, modoVista
 }: SeguimientoModalProps) => {
   
   // 1. USAMOS EL HOOK (Toda la lógica compleja está aquí dentro)
@@ -29,9 +29,10 @@ export const SeguimientoModal = ({
       filterEstado, handleFilterChange,
       pagina, setPagina,
       totalPaginas, datosPaginados, totalItems, estadosDisponibles, previousOtSet,
-      selectedEmployee, setSelectedEmployee,
+      selectedEmployee, handleSelectEmployee,
       empFilters, setEmpFilters,
-      employeeData, resetEmployee
+      employeeData, resetEmployee,
+        empSearch, setEmpSearch
   } = useSeguimientoModal({
       dataModo,
       dataAnterior,
@@ -52,8 +53,11 @@ export const SeguimientoModal = ({
             stats={employeeData.stats} 
             filters={empFilters} 
             setFilters={setEmpFilters} 
-            listaPlantas={LISTA_PLANTAS_INDIVIDUALES} 
+            activePlants={employeeData.activePlants} 
+            activePeriods={employeeData.activePeriods}
             onBack={resetEmployee}
+            searchTerm={empSearch}
+            setSearchTerm={setEmpSearch}
           />
         ) : (
           /* VISTA 2: LISTADO GENERAL */
@@ -64,6 +68,11 @@ export const SeguimientoModal = ({
                     <h2 className="text-lg font-black text-slate-800">{viewDetail.id}</h2>
                     <div className="flex items-center gap-2">
                         <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">{viewDetail.cat || (modoVista === "CUMPLIDAS" ? 'CUMPLIDAS' : 'GLOBAL')}</span>
+                        {viewDetail.periodo && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-600 border border-indigo-200">
+                                Periodo: {viewDetail.periodo}
+                            </span>
+                        )}
                         <span className="text-xs text-slate-400">Semana: {selectedSemana}</span>
                         <span className="text-xs text-slate-300">|</span>
                         <span className="text-xs font-bold text-slate-600">{totalItems} OTs</span>
@@ -106,7 +115,7 @@ export const SeguimientoModal = ({
                                 key={idx} 
                                 item={item}
                                 isNew={isItemNew} 
-                                onSelectEmployee={(name) => setSelectedEmployee(name)} 
+                                onSelectEmployee={(name) => handleSelectEmployee(name)} 
                             />
                         );
                     })

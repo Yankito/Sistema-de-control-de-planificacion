@@ -37,7 +37,7 @@ const mockViewDetail = {
     id: 'PF1', 
     esOB: false, 
     cat: undefined, 
-    isGlobal: false // IMPORTANTE: false para filtrar por planta especifica
+    isGlobal: false
 };
 
 describe('useSeguimientoModal Hook', () => {
@@ -82,7 +82,7 @@ describe('useSeguimientoModal Hook', () => {
     const { result } = renderHook(() => useSeguimientoModal(defaultProps));
 
     act(() => {
-      result.current.setSelectedEmployee('JUAN');
+      result.current.handleSelectEmployee('JUAN');
     });
 
     const { stats } = result.current.employeeData;
@@ -97,7 +97,7 @@ describe('useSeguimientoModal Hook', () => {
     const { result } = renderHook(() => useSeguimientoModal(defaultProps));
 
     act(() => {
-      result.current.setSelectedEmployee('JUAN');
+      result.current.handleSelectEmployee('JUAN');
     });
     expect(result.current.selectedEmployee).toBe('JUAN');
 

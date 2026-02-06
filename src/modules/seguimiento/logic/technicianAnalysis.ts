@@ -15,9 +15,9 @@ export const prepareEmployeeProfile = (
     allOrders: AtrasoRow[], // Data unificada (Backlog + Cumplimiento)
     plantasDisponibles: string[]
 ) => {
-    const techOrders = allOrders.filter(d => 
-        d.detallesTecnicos?.some(t => t.tecnico.toUpperCase() === techName)
-    );
+    const techOrders = allOrders.filter(d => {
+        return d.detallesTecnicos?.some(t => t.tecnico === techName);
+    });
 
     // 2. Calcular plantas activas
     const activePlants = Array.from(new Set(techOrders.map(o => o.planta))).sort();
@@ -29,7 +29,7 @@ export const prepareEmployeeProfile = (
     const stats = {
         total: uniqueOrders.length,
         cumplidas: uniqueOrders.filter(o => 
-            o.detallesTecnicos?.find(t => t.tecnico.toUpperCase() === techName)?.finalizada || 
+            o.detallesTecnicos?.find(t => t.tecnico === techName)?.finalizada || 
             o.clasificacion === 'CUMPLIDA'
         ).length,
         pendientes: 0 // Se calcula abajo
@@ -38,7 +38,7 @@ export const prepareEmployeeProfile = (
 
     return {
         employeeName: techName,
-        employeePlants: activePlants,
+        activePlants: activePlants,
         orders: uniqueOrders,
         stats: stats,
         listaPlantas: plantasDisponibles.filter(p => p !== "TODAS")
@@ -53,7 +53,7 @@ export const analyzeTechnicians = (
 
   // Helper para inicializar o recuperar un técnico
   const getStat = (nombre: string) => {
-      const key = nombre.toUpperCase().trim();
+      const key = nombre.trim();
       if (!map.has(key)) {
           map.set(key, { 
               nombre: key, 

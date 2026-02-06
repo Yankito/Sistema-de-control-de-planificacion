@@ -32,6 +32,7 @@ export interface AtrasoRow {
   detallesTecnicos?: TecnicoEstado[];
   rmd?: string;
   rse?: string;
+  fecha?: string;
 }
 
 export interface ActivoRow {

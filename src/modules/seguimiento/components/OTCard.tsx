@@ -1,14 +1,13 @@
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Calendar } from "lucide-react";
 
 interface OTCardProps {
   item: any;
-  isNew?: boolean; // <--- AGREGADO: Recibe la bandera desde el padre
+  isNew?: boolean;
   onSelectEmployee?: (name: string) => void;
   selectedEmployee?: string | null;
 }
 
 export const OTCard = ({ item, isNew, onSelectEmployee, selectedEmployee }: OTCardProps) => {
-  // Verificamos si es nueva por prop directa O si viene dentro del objeto item
   const esNueva = isNew || item.isNew;
 
   return (
@@ -17,7 +16,6 @@ export const OTCard = ({ item, isNew, onSelectEmployee, selectedEmployee }: OTCa
         <div className="flex items-center gap-2">
           <span className="text-sm font-black text-slate-900">{item.ot}</span>
           
-          {/* ETIQUETA NUEVA */}
           {esNueva && (
             <span className="bg-red-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse shadow-sm">
               NUEVA
@@ -25,9 +23,20 @@ export const OTCard = ({ item, isNew, onSelectEmployee, selectedEmployee }: OTCa
           )}
         </div>
         
+        {item.fecha && (
+          <div className="flex items-center gap-1 text-slate-400">
+            <Calendar size={10} />
+            <span className="text-[9px] font-bold">{item.fecha}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-3">
         <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold ${
-          item.clasificacion === 'PROGRAMADOR' ? 'bg-green-100 text-green-700' : 
-          item.clasificacion === 'TECNICO / SERVICIO' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+          item.clasificacion === 'CUMPLIDA' ? 'bg-green-100 text-green-700 border border-green-200' : 
+          item.clasificacion === 'PROGRAMADOR' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 
+          item.clasificacion === 'TECNICO / SERVICIO' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 
+          'bg-amber-100 text-amber-700 border border-amber-200'
         }`}>
           {item.clasificacion}
         </span>

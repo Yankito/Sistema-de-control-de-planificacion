@@ -188,18 +188,25 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
       const fechaRaw = fila["FECHA INICIAL PROGRAMADA"];
       let periodo = "S/A";
       let semana = "S/D";
+      let fechaFormateada = "";
 
       if (fechaRaw) {
         const fecha = new Date((Number(fechaRaw) - 25569) * 86400 * 1000);
         semana = getWeekLabel(fecha); 
         periodo = getPeriodoLabel(fecha); 
+
+        fechaFormateada = fecha.toLocaleDateString('es-ES', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric' 
+        });
       }
 
       const esOB = nroOT.toUpperCase().startsWith("OB");
 
       resultados.push({
         planta: plantaReal, ot: nroOT, descripcion, estado, clasificacion, 
-        periodo, semana, esOB, 
+        periodo, semana, esOB, fecha: fechaFormateada,
         detallesTecnicos: infoCumple?.tecnicos || [], 
         rmd: valRmd, rse: valRse
       });

@@ -10,7 +10,7 @@ interface ResumenProps {
   modoVista: "ATRASOS" | "CUMPLIDAS";
   isGlobal?: boolean;
   showComparison?: boolean;
-  onDetail: (cat?: string) => void;
+  onDetail: (cat?: string, periodo?: string) => void;
 }
 
 export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isGlobal, showComparison = false, onDetail }: ResumenProps) => {
@@ -83,10 +83,19 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
         <tbody>
           {modoVista === "ATRASOS" ? (
             <>
-              <tr onClick={() => onDetail()} className="border-b border-slate-100 bg-slate-50/30 hover:bg-slate-50 cursor-pointer font-black text-slate-900">
-                <td className="px-3 py-2 uppercase text-left">TOTAL ATRASOS</td>
+              <tr className="border-b border-slate-100 bg-slate-50/30 font-black text-slate-900">
+                <td 
+                  onClick={() => onDetail(undefined, undefined)} 
+                  className="px-3 py-2 uppercase text-left cursor-pointer hover:bg-slate-100"
+                >
+                  TOTAL ATRASOS
+                </td>
                 {columnasPeriodo.map(p => (
-                    <td key={p} className="text-center">
+                    <td 
+                      key={p} 
+                      onClick={() => onDetail(undefined, p)} // Filtra por periodo pero sin categoría
+                      className="text-center cursor-pointer hover:bg-indigo-50"
+                    >
                         <div className="flex items-center justify-center">
                             {getCount(dataset, p)} {renderDiff(getCount(dataset, p), getCount(datasetAnt, p))}
                         </div>
@@ -94,10 +103,19 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
                 ))}
               </tr>
               {categorias.map(cat => (
-                <tr key={cat} onClick={() => onDetail(cat)} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer text-slate-600">
-                  <td className="px-3 py-1.5 font-bold uppercase text-left pl-6 text-[10px]">{cat}</td>
+                <tr key={cat} className="border-b border-slate-50 text-slate-600">
+                  <td 
+                    onClick={() => onDetail(cat, undefined)} // Filtra por categoría pero todos los periodos
+                    className="px-3 py-1.5 font-bold uppercase text-left pl-6 text-[10px] cursor-pointer hover:bg-slate-100"
+                  >
+                    {cat}
+                  </td>
                   {columnasPeriodo.map(p => (
-                    <td key={p} className="text-center">
+                    <td 
+                      key={p} 
+                      onClick={() => onDetail(cat, p)} // Filtra por categoría Y periodo
+                      className="text-center cursor-pointer hover:bg-indigo-50 transition-colors"
+                    >
                         <div className="flex items-center justify-center">
                             {getCount(dataset, p, cat)} {renderDiff(getCount(dataset, p, cat), getCount(datasetAnt, p, cat))}
                         </div>
@@ -107,12 +125,12 @@ export const ResumenTable = ({ titulo, dataset, datasetAnt, esOB, modoVista, isG
               ))}
             </>
           ) : (
-            <tr onClick={() => onDetail()} className="hover:bg-green-50/50 cursor-pointer font-bold text-green-700">
-              <td className="px-3 py-3 uppercase text-left">TOTAL FINALIZADAS</td>
+            <tr className="hover:bg-green-50/50 font-bold text-green-700">
+              <td onClick={() => onDetail()} className="px-3 py-3 uppercase text-left cursor-pointer">TOTAL FINALIZADAS</td>
               {columnasPeriodo.map(p => (
-                <td key={p} className="text-center">
+                <td key={p} onClick={() => onDetail(undefined, p)} className="text-center cursor-pointer hover:bg-green-100">
                     <div className="flex items-center justify-center text-lg">
-                        {getCount(dataset, p)} {renderDiff(getCount(dataset, p), getCount(datasetAnt, p))}
+                        {getCount(dataset, p)}
                     </div>
                 </td>
               ))}

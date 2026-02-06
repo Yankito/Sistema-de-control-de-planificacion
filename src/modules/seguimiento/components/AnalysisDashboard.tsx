@@ -71,7 +71,8 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
   const currentView = viewStack[viewStack.length - 1];
 
   // Estados para EmployeeProfile
-  const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS" });
+  const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS", cumplimiento: "TODOS" });
+  const [empSearch, setEmpSearch] = useState("");
 
   // Cálculos Memoizados
   const flowStats = useMemo(() => analyzeBacklogFlow(currentData, prevData, currentCumplimiento), [currentData, prevData, currentCumplimiento]);
@@ -80,23 +81,85 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
 
   // Navegación
   const pushView = (view: ViewState) => setViewStack([...viewStack, view]);
-  const popView = () => { if (viewStack.length > 1) setViewStack(viewStack.slice(0, -1)); };
+  const popView = () => { 
+    if (viewStack.length > 1) {
+        setViewStack(viewStack.slice(0, -1));
+        setEmpSearch(""); // Limpiamos búsqueda al volver
+    } 
+  };
 
-  // Reseteo al cerrar
-  useEffect(() => { if (!isOpen) setViewStack([{ type: 'LIST' }]); }, [isOpen]);
+  const handleSelectTech = (tech: TechStats, plantaInicial: string = "TODAS") => {
+      setEmpFilters({ 
+          planta: plantaInicial, 
+          periodo: "TODOS", 
+          cumplimiento: "TODOS" 
+      });
+      setEmpSearch("");
+      pushView({ type: 'TECH_DETAIL', data: tech });
+  };
 
   // LOGICA PARA PREPARAR DATOS DE EMPLOYEE PROFILE
-  const employeeProfileProps = useMemo(() => {
-      if (currentView.type !== 'TECH_DETAIL') return null;
-      
-      const rawUniverse = [...currentData, ...currentCumplimiento];
-      
-      return prepareEmployeeProfile(
-          currentView.data.nombre.toUpperCase(),
-          rawUniverse,
-          plantasDisponibles
-      );
-  }, [currentView, currentData, currentCumplimiento, plantasDisponibles]);
+  // ... dentro de AnalysisDashboard ...
+
+const employeeProfileProps = useMemo(() => {
+    if (currentView.type !== 'TECH_DETAIL') return null;
+    
+    const techName = currentView.data.nombre;
+    const rawUniverse = [...currentData, ...currentCumplimiento];
+    
+    // 1. USAMOS TU FUNCIÓN para obtener la base de datos y plantas del técnico
+    const baseProps = prepareEmployeeProfile(techName, rawUniverse, plantasDisponibles);
+
+    // 2. APLICAMOS EL FILTRADO REACTIVO (Esto es lo que te faltaba para que los selects funcionen)
+    
+    // Filtro para los STATS (Solo Planta y Periodo)
+    let statsOrders = baseProps.orders;
+    if (empFilters.planta !== "TODAS") {
+        statsOrders = statsOrders.filter(o => o.planta === empFilters.planta);
+    }
+    if (empFilters.periodo !== "TODOS") {
+        statsOrders = statsOrders.filter(o => o.periodo === empFilters.periodo);
+    }
+
+    // Recalculamos totales basados en Planta/Periodo para el % de cumplimiento
+    const total = statsOrders.length;
+    const cumplidas = statsOrders.filter(o => {
+        const infoTec = o.detallesTecnicos?.find(t => t.tecnico === techName);
+        return infoTec ? infoTec.finalizada : (o.clasificacion === 'CUMPLIDA');
+    }).length;
+
+    // Filtro para la LISTA VISUAL (Base de stats + Cumplimiento + Buscador)
+    let listOrders = [...statsOrders];
+
+    if (empFilters.cumplimiento !== "TODOS") {
+        const esCumplida = empFilters.cumplimiento === "CUMPLIDAS";
+        listOrders = listOrders.filter(o => {
+            const infoTec = o.detallesTecnicos?.find(t => t.tecnico === techName);
+            return infoTec ? infoTec.finalizada === esCumplida : (o.clasificacion === 'CUMPLIDA' === esCumplida);
+        });
+    }
+
+    if (empSearch) {
+        const term = empSearch.toLowerCase();
+        listOrders = listOrders.filter(o => 
+            o.ot.toLowerCase().includes(term) || 
+            o.descripcion.toLowerCase().includes(term)
+        );
+    }
+
+    // 3. RETORNAMOS TODO UNIFICADO
+    return {
+        ...baseProps,         // Trae employeeName, activePlants, etc.
+        orders: listOrders,    // La lista filtrada reactivamente
+        stats: {               // Los stats calculados según planta/periodo
+            total, 
+            cumplidas, 
+            pendientes: total - cumplidas 
+        }
+    };
+    
+    // AGREGAMOS empFilters y empSearch como dependencias para que el filtro "despierte"
+}, [currentView, currentData, currentCumplimiento, plantasDisponibles, empFilters, empSearch]);
 
 
   return (
@@ -126,6 +189,8 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
                         {...employeeProfileProps}
                         filters={empFilters}
                         setFilters={setEmpFilters}
+                        searchTerm={empSearch}
+                        setSearchTerm={setEmpSearch}
                         onBack={popView}
                     />
                 </div>
@@ -139,8 +204,10 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
                     flowStats={flowStats}
                     techStats={techStats}
                     plantasDisponibles={plantasDisponibles}
-                    onSelectOT={(item: OTFlowResult) => pushView({ type: 'OT_DETAIL', data: item })}
-                    onSelectTech={(item: TechStats) => pushView({ type: 'TECH_DETAIL', data: item })}
+                    onSelectOT={(item) => pushView({ type: 'OT_DETAIL', data: item })}
+                    onSelectTech={(item, currentPlantaFilter) => {
+                        handleSelectTech(item, currentPlantaFilter);
+                    }}
                 />
             )}
         </div>

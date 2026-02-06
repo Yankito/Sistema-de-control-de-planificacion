@@ -76,7 +76,7 @@ describe('useSeguimientoModal Hook', () => {
     const { result } = renderHook(() => useSeguimientoModal(defaultProps));
 
     act(() => {
-      result.current.setSelectedEmployee('JUAN');
+      result.current.handleSelectEmployee('JUAN');
     });
 
     const { stats } = result.current.employeeData;
@@ -90,7 +90,7 @@ describe('useSeguimientoModal Hook', () => {
     const { result } = renderHook(() => useSeguimientoModal(defaultProps));
 
     act(() => {
-      result.current.setSelectedEmployee('JUAN');
+      result.current.handleSelectEmployee('JUAN');
     });
     expect(result.current.selectedEmployee).toBe('JUAN');
 

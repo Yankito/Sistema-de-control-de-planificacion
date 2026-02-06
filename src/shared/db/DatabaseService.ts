@@ -27,7 +27,9 @@ export class DatabaseService {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           snapshot_id INTEGER,
           planta TEXT, ot TEXT, descripcion TEXT, estado TEXT, clasificacion TEXT,
-          es_ob BOOLEAN, periodo TEXT, semana TEXT, rmd TEXT, rse TEXT, detalles_tecnicos TEXT, 
+          es_ob BOOLEAN, periodo TEXT, semana TEXT, rmd TEXT, rse TEXT, 
+          detalles_tecnicos TEXT, 
+          fecha TEXT, -- <--- NUEVA COLUMNA
           FOREIGN KEY(snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
         );
       `);
@@ -109,10 +111,10 @@ export class DatabaseService {
         const values: string[] = [];
         const params: any[] = [];
         chunk.forEach(row => {
-            values.push(`(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-            params.push(snapshotId, row.planta, row.ot, row.descripcion, row.estado, row.clasificacion, row.esOB ? 1 : 0, row.periodo, row.semana, row.rmd || "", row.rse || "", JSON.stringify(row.detallesTecnicos || []));
+            values.push(`(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            params.push(snapshotId, row.planta, row.ot, row.descripcion, row.estado, row.clasificacion, row.esOB ? 1 : 0, row.periodo, row.semana, row.rmd || "", row.rse || "", JSON.stringify(row.detallesTecnicos || []), row.fecha || "");
         });
-        await db.execute(`INSERT INTO registros (snapshot_id, planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos) VALUES ${values.join(", ")}`, params);
+        await db.execute(`INSERT INTO registros (snapshot_id, planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos, fecha) VALUES ${values.join(", ")}`, params);
     }
   }
 
@@ -182,7 +184,7 @@ export class DatabaseService {
     return registros.map(r => ({
         planta: r.planta, ot: r.ot, descripcion: r.descripcion, estado: r.estado, clasificacion: r.clasificacion,
         esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
-        periodo: r.periodo, semana: r.semana, rmd: r.rmd, rse: r.rse, detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]")
+        periodo: r.periodo, semana: r.semana, rmd: r.rmd, rse: r.rse, detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"), fecha: r.fecha
     }));
   }
 
@@ -193,7 +195,7 @@ export class DatabaseService {
 
     const id = snapshot[0].id;
     const registros = await db.select<any[]>(`
-        SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos 
+        SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos, fecha
         FROM registros WHERE snapshot_id = $1`, [id]);
     
     return registros.map(r => ({
@@ -208,7 +210,8 @@ export class DatabaseService {
         semana: r.semana,
         rmd: r.rmd,
         rse: r.rse,
-        detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]")
+        detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"),
+        fecha: r.fecha
     }));
   }
 

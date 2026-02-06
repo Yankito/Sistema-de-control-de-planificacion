@@ -9,6 +9,7 @@ interface FilterOptions {
     esOB: boolean; 
     cat?: string; 
     isGlobal?: boolean 
+    periodo?: string;
   };
   filterEstado: string;
   searchTerm: string;
@@ -31,13 +32,16 @@ export const filterOrders = (
   // Planta (o Grupo Global), Tipo (OB/OM) y Categoría (Programador, etc.)
   // -----------------------------------------------------------------------
   const baseData = data.filter(d => {
-      // 1. Filtro Tipo (Infraestructura vs Mantención)
+      // 1. Filtro Tipo (OB/OM)
       if (d.esOB !== filters.viewDetail.esOB) return false;
 
-      // 2. Filtro Categoría (opcional)
+      // 2. Filtro Categoría (Si se seleccionó una fila específica)
       if (filters.viewDetail.cat && d.clasificacion !== filters.viewDetail.cat) return false;
 
-      // 3. Filtro Planta (Lógica Global vs Individual)
+      // 3. NUEVO: Filtro Periodo (Si se seleccionó una columna/mes específico)
+      if (filters.viewDetail.periodo && d.periodo !== filters.viewDetail.periodo) return false;
+
+      // 4. Filtro Planta
       let matchPlanta = true;
       if (filters.viewDetail.isGlobal) {
           if (filters.viewDetail.id === "COMPLEJO") {
@@ -51,7 +55,6 @@ export const filterOrders = (
       
       return matchPlanta;
   });
-
   // -----------------------------------------------------------------------
   // NIVEL 2: FILTRADO DINÁMICO (Interacción Usuario)
   // Filtra por lo que el usuario hace DENTRO del modal:

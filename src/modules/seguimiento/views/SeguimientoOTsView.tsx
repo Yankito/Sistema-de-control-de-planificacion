@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { AtrasoRow } from "../types";
-import { BarChart3, PieChart, Factory } from "lucide-react";
+import { BarChart3, PieChart, Factory, History, FileText, Trash2, Database } from "lucide-react";
 import { ResumenTable } from "../components/ResumenTable";
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { DatabaseService } from "../../../shared/db/DatabaseService";
@@ -49,11 +49,11 @@ export const SeguimientoOTsView = ({
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [selectedYear, setSelectedYear] = useState<string>("TODOS"); 
     const [selectedSemana, setSelectedSemana] = useState("TODAS");
-    const [viewDetail, setViewDetail] = useState<{ id: string, esOB: boolean, cat?: string, isGlobal?: boolean } | null>(null);
+    const [viewDetail, setViewDetail] = useState<{ id: string, esOB: boolean, cat?: string, isGlobal?: boolean, periodo?: string } | null>(null);
 
     // 3. CONSTANTES Y MEMOS
     const PLANTAS_COMPLEJO = useMemo(() => ["PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "DC", "VENTAS"], []);
-    const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", "MPS", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
+    const PLANTAS_PF_ALIMENTOS = useMemo(() => ["PF1", "PF2", ...PLANTAS_COMPLEJO], [PLANTAS_COMPLEJO]);
     const LISTA_PLANTAS_INDIVIDUALES = useMemo(() => ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "OTROS", "MPS", "DC", "VENTAS"], []);
     const LISTA_CUMPLIMIENTO = useMemo(() => LISTA_PLANTAS_INDIVIDUALES, [LISTA_PLANTAS_INDIVIDUALES]);
 
@@ -116,38 +116,110 @@ export const SeguimientoOTsView = ({
     }, [dataActual, selectedYear]);
 
     return (
-        <div className="relative p-6 h-full overflow-y-auto bg-slate-50/50">
-            {isLoading && <LoadingOverlay message="Procesando datos y comparativas..." />}
+        <div className="relative p-6 h-full overflow-y-auto bg-slate-50/50 flex flex-col gap-4">
+            {isLoading && <LoadingOverlay message="Procesando datos..." />}
 
-            <div className="flex justify-end mb-4">
-                <ExportButton 
-                    elementId="dashboard-atrasos-container"
-                    fileName={`Seguimiento_${modoVista}_${reporteActual}`}
-                    plantaSeleccionada="PF ALIMENTOS (CONSOLIDADO)"
-                    rangoTexto={reporteActual} 
-                    semana={reporteActual.split('-')[1] || reporteActual}
-                    reportTitle={modoVista === "ATRASOS" ? "Tablero de Atrasos" : "Tablero de Cumplimiento"}
-                />
-                <button 
-                    onClick={() => setShowAnalysis(true)}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-lg hover:bg-indigo-700 transition-all font-bold text-sm animate-in fade-in disabled:opacity-50"
-                >
-                    <BarChart3 size={18} />
-                    Analizar Evolución y Técnicos
-                </button>
-            </div>
+            {/* --- CABECERA PRINCIPAL --- */}
+            <header className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-6">
+                
+                {/* NIVEL 1: GESTIÓN DE REPORTES (SNAPSHOTS) */}
+                <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-6">
+                        <div>
+                            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Seguimiento OTs</h1>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Control de Gestión Operativa</p>
+                        </div>
 
-            <SeguimientoHeader 
-                modoVista={modoVista} setModoVista={setModoVista}
-                reporteSeleccionado={reporteActual} setReporteSeleccionado={cargarReporte}
-                listaReportesDisponibles={historialCompleto}
-                selectedYear={selectedYear} setSelectedYear={setSelectedYear} yearsInRows={yearsInRows}
-                selectedSemana={selectedSemana} setSelectedSemana={setSelectedSemana} semanasInRows={semanasInRows}
-                semanaComparar={semanaComparar} onCambiarComparacion={cambiarComparacion} onEliminarReporte={handleEliminarReporte}
-                onExportarReporte={handleExportarExcelCompleto}
-                resetViewDetail={() => { setViewDetail(null); }}
-            />
+                        {/* SELECTOR DE REPORTE PRINCIPAL */}
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">
+                                <Database size={10}/> Reporte Base
+                            </label>
+                            <select 
+                                value={reporteActual} 
+                                onChange={(e) => cargarReporte(e.target.value)} 
+                                className="text-xs font-black bg-blue-50 text-blue-900 px-3 py-2 rounded-xl border border-blue-100 outline-none cursor-pointer"
+                            >
+                                {historialCompleto.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                        </div>
+
+                        {/* SELECTOR DE COMPARACIÓN */}
+                        {modoVista === "ATRASOS" && (
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1">
+                                        <History size={10}/> Comparar con
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <select 
+                                        value={semanaComparar} 
+                                        onChange={(e) => cambiarComparacion(e.target.value)} 
+                                        className={`text-xs font-black px-3 py-2 rounded-xl border outline-none cursor-pointer transition-colors ${semanaComparar ? 'bg-indigo-50 border-indigo-100 text-indigo-900' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                                    >
+                                        <option value="">(Sin comparación)</option>
+                                        {historialCompleto.filter(r => r !== reporteActual).map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                    {semanaComparar && (
+                                        <button onClick={handleEliminarReporte} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar este reporte de la DB">
+                                            <Trash2 size={16}/>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* BOTÓN ANÁLISIS (ACCION PRINCIPAL) */}
+                    <button 
+                        onClick={() => setShowAnalysis(true)}
+                        className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 active:translate-y-0 transition-all font-black text-xs"
+                    >
+                        <BarChart3 size={18} />
+                        CENTRO DE ANÁLISIS
+                    </button>
+                </div>
+
+                {/* NIVEL 2: FILTROS Y EXPORTACIÓN */}
+                <div className="flex justify-between items-center">
+                    <SeguimientoHeader 
+                        modoVista={modoVista} setModoVista={setModoVista}
+                        // Ya no pasamos los selectores de snapshot aquí para no saturar
+                        selectedYear={selectedYear} setSelectedYear={setSelectedYear} yearsInRows={yearsInRows}
+                        selectedSemana={selectedSemana} setSelectedSemana={setSelectedSemana} semanasInRows={semanasInRows}
+                        resetViewDetail={() => setViewDetail(null)}
+                        // Estos ya no se usan en el header simplificado
+                        reporteSeleccionado={reporteActual} setReporteSeleccionado={cargarReporte} listaReportesDisponibles={historialCompleto}
+                        semanaComparar={semanaComparar} onCambiarComparacion={cambiarComparacion} onEliminarReporte={handleEliminarReporte}
+                        onExportarReporte={handleExportarExcelCompleto}
+                    />
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                        {/* EXPORTAR IMAGEN (Dashboard) */}
+                        <ExportButton 
+                            elementId="dashboard-atrasos-container"
+                            fileName={`Dashboard_${modoVista}_${reporteActual}`}
+                            plantaSeleccionada="CONSOLIDADO"
+                            rangoTexto={reporteActual} 
+                            semana={reporteActual}
+                            reportTitle={modoVista === "ATRASOS" ? "Tablero de Atrasos" : "Tablero de Cumplimiento"}
+                        />
+                        
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+
+                        {/* EXPORTAR EXCEL (Datos) */}
+                        {modoVista === "ATRASOS" && (
+                            <button 
+                                onClick={handleExportarExcelCompleto} 
+
+                                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 border border-slate-800 bg-slate-900 text-white hover:bg-black hover:shadow-pf-red/20`}
+                            >
+                                <FileText size={14} /> 
+                                DESCARGAR EXCEL
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </header>
 
             <div id="dashboard-atrasos-container" className="p-2 bg-slate-50/50"> 
             {modoVista === "ATRASOS" ? (
@@ -161,14 +233,14 @@ export const SeguimientoOTsView = ({
                                 dataset={dataFiltrada.filter(d => (!!d.esOB === tipo.es) && PLANTAS_COMPLEJO.includes(d.planta))} 
                                 datasetAnt={dataAnteriorFiltrada.filter(d => (!!d.esOB === tipo.es) && PLANTAS_COMPLEJO.includes(d.planta))} 
                                 esOB={tipo.es} modoVista={modoVista} isGlobal showComparison={!!semanaComparar} 
-                                onDetail={(cat) => setViewDetail({id:"COMPLEJO", esOB:tipo.es, cat, isGlobal:true})} 
+                                onDetail={(cat, periodo) => setViewDetail({id:"COMPLEJO", esOB:tipo.es, cat, periodo, isGlobal:true})} 
                             />
                             <ResumenTable 
                                 titulo="PF ALIMENTOS" 
                                 dataset={dataFiltrada.filter(d => (!!d.esOB === tipo.es) && PLANTAS_PF_ALIMENTOS.includes(d.planta))} 
                                 datasetAnt={dataAnteriorFiltrada.filter(d => (!!d.esOB === tipo.es) && PLANTAS_PF_ALIMENTOS.includes(d.planta))} 
                                 esOB={tipo.es} modoVista={modoVista} isGlobal showComparison={!!semanaComparar}
-                                onDetail={(cat) => setViewDetail({id:"PF ALIMENTOS", esOB:tipo.es, cat, isGlobal:true})} 
+                                onDetail={(cat, periodo) => setViewDetail({id:"PF ALIMENTOS", esOB:tipo.es, cat, periodo, isGlobal:true})} 
                             />
                         </div>
                         ))}
@@ -196,7 +268,7 @@ export const SeguimientoOTsView = ({
                                     dataset={dataFiltrada.filter(d => d.planta === p && (!!d.esOB === tipo.es))} 
                                     datasetAnt={dataAnteriorFiltrada.filter(d => d.planta === p && (!!d.esOB === tipo.es))} 
                                     esOB={tipo.es} modoVista={modoVista} showComparison={!!semanaComparar}
-                                    onDetail={(cat) => setViewDetail({id:p, esOB:tipo.es, cat})} 
+                                    onDetail={(cat, periodo) => setViewDetail({id:p, esOB:tipo.es, cat, periodo})} 
                                 />
                             ))}
                         </div>
