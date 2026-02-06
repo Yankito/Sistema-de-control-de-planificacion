@@ -25,6 +25,7 @@ vi.mock("@tauri-apps/plugin-sql", () => {
 const mockAtrasoRow = {
     planta: 'PF1',
     ot: '100',
+    nroActivo: 'A-123',
     descripcion: 'Test',
     estado: 'Pendiente',
     clasificacion: 'TECNICO',
@@ -51,7 +52,7 @@ describe('DatabaseService', () => {
       
       expect(Database.load).toHaveBeenCalledWith("sqlite:pf_seguimiento.db");
       
-      // CORRECCIÓN 1: Son 7 llamadas (5 tablas + 2 índices)
+      // CORRECCIÓN 1: Son 6 llamadas (4 tablas + 3 índices)
       expect(mockExecute).toHaveBeenCalledTimes(7); 
       expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('CREATE TABLE IF NOT EXISTS snapshots'));
     });
@@ -82,21 +83,21 @@ describe('DatabaseService', () => {
       // 2. Insertó el snapshot
       expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO snapshots'), ['2026-S05', 'SEGUIMIENTO']);
 
-      // 3. Insertó los registros
+      // 3. Insertó los pedidos_de_trabajo
       // Buscamos la llamada que contiene el INSERT masivo
-      const insertCall = mockExecute.mock.calls.find(call => call[0].includes('INSERT INTO registros'));
+      const insertCall = mockExecute.mock.calls.find(call => call[0].includes('INSERT INTO pedidos_de_trabajo'));
       expect(insertCall).toBeDefined();
       if (!insertCall) {
-        throw new Error('Expected INSERT INTO registros call was not found');
+        throw new Error('Expected INSERT INTO pedidos_de_trabajo call was not found');
       }
 
       const params = insertCall[1]; 
       expect(params[0]).toBe(123); 
-      expect(params[6]).toBe(1); // esOB (true -> 1)
-      expect(params[11]).toBe(JSON.stringify(mockAtrasoRow.detallesTecnicos));
+      expect(params[7]).toBe(1); // esOB (true -> 1)
+      expect(params[12]).toBe(JSON.stringify(mockAtrasoRow.detallesTecnicos));
     });
 
-    it('debería borrar registros viejos si el snapshot YA existe (Update)', async () => {
+    it('debería borrar pedidos_de_trabajo viejos si el snapshot YA existe (Update)', async () => {
       // Inyectamos DB para saltar init()
       (DatabaseService as any).db = mockDbInstance;
 
@@ -106,7 +107,7 @@ describe('DatabaseService', () => {
       await DatabaseService.guardarSnapshot('2026-S05', 'SEGUIMIENTO', []);
 
       // Verificamos que borró lo viejo usando el ID recuperado (55)
-      expect(mockExecute).toHaveBeenCalledWith("DELETE FROM registros WHERE snapshot_id = $1", [55]);
+      expect(mockExecute).toHaveBeenCalledWith("DELETE FROM pedidos_de_trabajo WHERE snapshot_id = $1", [55]);
       // Verificamos que actualizó la fecha
       expect(mockExecute).toHaveBeenCalledWith(expect.stringContaining("UPDATE snapshots"), [55]);
     });

@@ -23,6 +23,7 @@ export interface TecnicoEstado {
 export interface AtrasoRow {
   planta: string;
   ot: string;
+  nroActivo?: string;
   descripcion: string;
   estado: string;
   clasificacion: "CUMPLIDA" | "TECNICO / SERVICIO" | "PROGRAMADOR" | "OC / OTRO";

@@ -98,7 +98,6 @@ export const SeguimientoOTsView = ({
         if (!semanaComparar) return;
         if (await confirm(`¿Eliminar reporte: ${semanaComparar}?`, { title: 'Confirmar', kind: 'warning' })) {
             await DatabaseService.deleteSnapshot(semanaComparar, 'SEGUIMIENTO');
-            await DatabaseService.deleteSnapshot(semanaComparar, 'CUMPLIMIENTO'); 
             limpiarComparacion();
             if (onReporteEliminado) onReporteEliminado();
         }

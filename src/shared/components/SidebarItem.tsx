@@ -21,7 +21,7 @@ export const SidebarItem = ({
       disabled={locked}
       title={isCollapsed ? label : ''}
       className={`
-        flex items-center w-full p-3 rounded-xl transition-all duration-200 group relative
+        flex items-center w-full p-2 rounded-xl transition-all duration-200 group relative
         ${isCollapsed ? 'justify-center' : 'justify-between'}
         ${locked ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-slate-100'}
         ${isActive && !locked ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-600'}
@@ -32,7 +32,7 @@ export const SidebarItem = ({
         <Icon size={20} className={`min-w-[20px] ${isActive && !locked ? 'text-pf-red' : ''}`} />
         
         <span className={`
-          font-black text-sm whitespace-nowrap overflow-hidden transition-all duration-300 uppercase tracking-tight
+          font-black whitespace-nowrap overflow-hidden transition-all duration-300 uppercase tracking-tight
           ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100 ml-4'}
         `}>
           {label}

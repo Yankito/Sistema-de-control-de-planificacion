@@ -49,11 +49,13 @@ function App() {
       onPlanLoaded: planning.cargarDatosDesdeExcel,
       onFallasLoaded: setFallasResult,
       onSeguimientoLoaded: async () => {
-          // Recargar historial y cargar la semana subida
           const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
           setHistorialSemanas(semanas);
           await seguimiento.cargarReporte(targetUploadWeek);
-          // Nota: setActiveTab ya lo maneja useFileProcessor internamente
+          // Al cargar uno nuevo, intentamos buscar el anterior para la comparación del Dashboard
+          if (semanas.length > 1) {
+            await seguimiento.cambiarComparacion(semanas[1]);
+          }
       }
   });
 
@@ -61,23 +63,23 @@ function App() {
   useEffect(() => {
     const initApp = async () => {
         await DatabaseService.init();
-        
-        // Cargar listas disponibles
         const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
         setHistorialSemanas(semanas);
         
-        // Lógica de arranque automático
-        // Si hay datos históricos, cargamos el más reciente
         if (semanas.length > 0) {
              const ultimaSemana = semanas[0];
-             // Cargamos los datos en el hook
              await seguimiento.cargarReporte(ultimaSemana);
-             // Y mostramos la vista
+             
+             // NUEVO: Si hay una semana anterior, la cargamos automáticamente para el Dashboard
+             if (semanas.length > 1) {
+               await seguimiento.cambiarComparacion(semanas[1]);
+             }
+             
              setActiveTab("seguimiento");
         }
     };
     initApp();
-  }, []); // Se ejecuta solo una vez al montar
+  }, []);
 
   // --- 7. UTILS DE UI ---
   const handleRequestUpload = (tipo: FileType) => {
@@ -153,6 +155,12 @@ function App() {
                     setActiveTab("plan");
                 }}
                 seguimientoResult={seguimiento.dataActual}
+                seguimientoPrevio={seguimiento.dataAnterior}
+                
+                // PASAMOS EL CONTEXTO DE SEMANAS
+                reporteActual={seguimiento.reporteActual}
+                semanaComparar={seguimiento.semanaComparar}
+                
                 fallasResult={fallasResult}
                 setActiveTab={setActiveTab}
                 archivoCargado={!!planning.workbookActual}

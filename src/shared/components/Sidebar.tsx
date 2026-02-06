@@ -148,6 +148,7 @@ export const Sidebar = ({
               isCollapsed={isCollapsed}
               locked={item.locked}
               onClick={() => setActiveTab(item.id)}
+              className="py-2 text-sm font-medium"
             />
           );
         })}

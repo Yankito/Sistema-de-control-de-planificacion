@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import { AtrasoRow, ActivoRow, MasivoRow, CumplimientoRow } from "../../modules/seguimiento/types";
+import { AtrasoRow, ActivoRow, CumplimientoRow } from "../../modules/seguimiento/types";
 
 const DB_NAME = "sqlite:pf_seguimiento.db";
 
@@ -10,44 +10,44 @@ export class DatabaseService {
     if (!this.db) {
       this.db = await Database.load(DB_NAME);
       
-      // 1. SNAPSHOTS: Actualizamos el CHECK para permitir los nuevos tipos RAW
+      // 1. SNAPSHOTS (Se mantiene igual)
       await this.db.execute(`
         CREATE TABLE IF NOT EXISTS snapshots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           semana TEXT NOT NULL,
-          tipo TEXT CHECK( tipo IN ('SEGUIMIENTO', 'CUMPLIMIENTO', 'MASIVO_RAW', 'CUMPLIMIENTO_RAW') ) NOT NULL,
+          tipo TEXT CHECK( tipo IN ('SEGUIMIENTO', 'CUMPLIMIENTO') ) NOT NULL,
           fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(semana, tipo)
         );
       `);
 
-      // 2. REGISTROS (Tabla procesada para UI - Se mantiene igual)
+      // 2. PEDIDOS DE TRABAJO (Tabla consolidada y renombrada)
       await this.db.execute(`
-        CREATE TABLE IF NOT EXISTS registros (
+        CREATE TABLE IF NOT EXISTS pedidos_de_trabajo (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           snapshot_id INTEGER,
-          planta TEXT, ot TEXT, descripcion TEXT, estado TEXT, clasificacion TEXT,
-          es_ob BOOLEAN, periodo TEXT, semana TEXT, rmd TEXT, rse TEXT, 
+          planta TEXT, 
+          ot TEXT, 
+          nro_activo TEXT,
+          descripcion TEXT, 
+          estado TEXT, 
+          clasificacion TEXT,
+          es_ob BOOLEAN, 
+          periodo TEXT, 
+          semana TEXT, 
+          rmd TEXT, 
+          rse TEXT, 
           detalles_tecnicos TEXT, 
-          fecha TEXT, -- <--- NUEVA COLUMNA
+          fecha TEXT,
           FOREIGN KEY(snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
         );
       `);
 
-      // 3. NUEVA TABLA: DATOS MASIVO (Estructura espejo del Excel)
+      // 3. ACTIVOS (Se mantiene igual)
       await this.db.execute(`
-        CREATE TABLE IF NOT EXISTS datos_masivo (
+        CREATE TABLE IF NOT EXISTS activos (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          snapshot_id INTEGER,
-          numero_ot TEXT,
-          activo TEXT,
-          descripcion TEXT,
-          tpt TEXT,
-          fecha_progr TEXT,
-          horas REAL,
-          rmd TEXT,
-          rse TEXT,
-          FOREIGN KEY(snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
+          codigo TEXT UNIQUE, descripcion TEXT, planta TEXT, ubicacion TEXT
         );
       `);
 
@@ -66,17 +66,10 @@ export class DatabaseService {
           FOREIGN KEY(snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
         );
       `);
-      
-      // 5. ACTIVOS (Se mantiene igual)
-      await this.db.execute(`
-        CREATE TABLE IF NOT EXISTS activos (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          codigo TEXT UNIQUE, descripcion TEXT, planta TEXT, ubicacion TEXT
-        );
-      `);
 
-      await this.db.execute(`CREATE INDEX IF NOT EXISTS idx_registros_snapshot ON registros(snapshot_id);`);
-      await this.db.execute(`CREATE INDEX IF NOT EXISTS idx_registros_semana ON registros(semana);`);
+      await this.db.execute(`CREATE INDEX IF NOT EXISTS idx_pedidos_snapshot ON pedidos_de_trabajo(snapshot_id);`);
+      await this.db.execute(`CREATE INDEX IF NOT EXISTS idx_pedidos_semana ON pedidos_de_trabajo(semana);`);
+      await this.db.execute(`CREATE INDEX IF NOT EXISTS idx_cumplimiento_snapshot ON datos_cumplimiento(snapshot_id);`);
     }
     return this.db;
   }
@@ -88,68 +81,61 @@ export class DatabaseService {
   }
 
   // --- GUARDAR REPORTE PROCESADO ---
-  static async guardarSnapshot(semana: string, tipo: string, data: AtrasoRow[]) {
+  static async guardarSnapshot(semana: string, tipo: string, data: any[]) {
     const db = await this.init();
-    // 1. Upsert Snapshot
+    
     const existe = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
     let snapshotId: number;
 
     if (existe.length > 0) {
-        const idViejo = existe[0].id;
-        await db.execute("DELETE FROM registros WHERE snapshot_id = $1", [idViejo]);
-        await db.execute("UPDATE snapshots SET fecha_carga = CURRENT_TIMESTAMP WHERE id = $1", [idViejo]);
-        snapshotId = idViejo;
+        snapshotId = existe[0].id;
+        await db.execute("DELETE FROM pedidos_de_trabajo WHERE snapshot_id = $1", [snapshotId]);
+        
+        await db.execute("UPDATE snapshots SET fecha_carga = CURRENT_TIMESTAMP WHERE id = $1", [snapshotId]);
+        
     } else {
         const res = await db.execute("INSERT INTO snapshots (semana, tipo) VALUES ($1, $2)", [semana, tipo]);
         snapshotId = (res as any).lastInsertId;
     }
 
-    // 2. Insertar Registros
     const batchSize = 100;
     for (let i = 0; i < data.length; i += batchSize) {
         const chunk = data.slice(i, i + batchSize);
         const values: string[] = [];
         const params: any[] = [];
         chunk.forEach(row => {
-            values.push(`(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-            params.push(snapshotId, row.planta, row.ot, row.descripcion, row.estado, row.clasificacion, row.esOB ? 1 : 0, row.periodo, row.semana, row.rmd || "", row.rse || "", JSON.stringify(row.detallesTecnicos || []), row.fecha || "");
+            // 14 Columnas ahora incluyendo nro_activo
+            values.push(`(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            params.push(
+                snapshotId, 
+                row.planta, 
+                row.ot, 
+                row.nroActivo || "",
+                row.descripcion, 
+                row.estado, 
+                row.clasificacion, 
+                row.esOB ? 1 : 0, 
+                row.periodo, 
+                row.semana, 
+                row.rmd || "", 
+                row.rse || "", 
+                JSON.stringify(row.detallesTecnicos || []), 
+                row.fecha || ""
+            );
         });
-        await db.execute(`INSERT INTO registros (snapshot_id, planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos, fecha) VALUES ${values.join(", ")}`, params);
-    }
-  }
-
-  // --- NUEVO: GUARDAR MASIVO RAW ---
-  static async guardarMasivoRaw(semana: string, data: MasivoRow[]) {
-    const db = await this.init();
-    const existe = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = 'MASIVO_RAW'", [semana]);
-    let snapshotId: number;
-
-    if (existe.length > 0) {
-        const idViejo = existe[0].id;
-        await db.execute("DELETE FROM datos_masivo WHERE snapshot_id = $1", [idViejo]);
-        snapshotId = idViejo;
-    } else {
-        const res = await db.execute("INSERT INTO snapshots (semana, tipo) VALUES ($1, 'MASIVO_RAW')", [semana]);
-        snapshotId = (res as any).lastInsertId;
-    }
-
-    const batchSize = 100;
-    for (let i = 0; i < data.length; i += batchSize) {
-        const chunk = data.slice(i, i + batchSize);
-        const values: string[] = [];
-        const params: any[] = [];
-        chunk.forEach(r => {
-            values.push(`(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-            params.push(snapshotId, r.numero_ot, r.activo, r.descripcion, r.tpt, r.fecha_progr, r.horas, r.rmd, r.rse);
-        });
-        await db.execute(`INSERT INTO datos_masivo (snapshot_id, numero_ot, activo, descripcion, tpt, fecha_progr, horas, rmd, rse) VALUES ${values.join(", ")}`, params);
+        await db.execute(`
+          INSERT INTO pedidos_de_trabajo (
+            snapshot_id, planta, ot, nro_activo, descripcion, estado, 
+            clasificacion, es_ob, periodo, semana, rmd, rse, 
+            detalles_tecnicos, fecha
+          ) VALUES ${values.join(", ")}`, params);
     }
   }
 
   // --- NUEVO: GUARDAR CUMPLIMIENTO RAW ---
   static async guardarCumplimientoRaw(semana: string, data: CumplimientoRow[]) {
     const db = await this.init();
-    const existe = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = 'CUMPLIMIENTO_RAW'", [semana]);
+    const existe = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = 'CUMPLIMIENTO'", [semana]);
     let snapshotId: number;
 
     if (existe.length > 0) {
@@ -157,7 +143,7 @@ export class DatabaseService {
         await db.execute("DELETE FROM datos_cumplimiento WHERE snapshot_id = $1", [idViejo]);
         snapshotId = idViejo;
     } else {
-        const res = await db.execute("INSERT INTO snapshots (semana, tipo) VALUES ($1, 'CUMPLIMIENTO_RAW')", [semana]);
+        const res = await db.execute("INSERT INTO snapshots (semana, tipo) VALUES ($1, 'CUMPLIMIENTO')", [semana]);
         snapshotId = (res as any).lastInsertId;
     }
 
@@ -179,12 +165,14 @@ export class DatabaseService {
     const snapshot = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
     if (snapshot.length === 0) return [];
     const id = snapshot[0].id;
-    const registros = await db.select<any[]>(`SELECT * FROM registros WHERE snapshot_id = $1`, [id]);
+    const rows = await db.select<any[]>(`SELECT * FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
     
-    return registros.map(r => ({
-        planta: r.planta, ot: r.ot, descripcion: r.descripcion, estado: r.estado, clasificacion: r.clasificacion,
+    return rows.map(r => ({
+        planta: r.planta, ot: r.ot, nroActivo: r.nro_activo, descripcion: r.descripcion, 
+        estado: r.estado, clasificacion: r.clasificacion,
         esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
-        periodo: r.periodo, semana: r.semana, rmd: r.rmd, rse: r.rse, detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"), fecha: r.fecha
+        periodo: r.periodo, semana: r.semana, rmd: r.rmd, rse: r.rse, 
+        detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"), fecha: r.fecha
     }));
   }
 
@@ -194,17 +182,17 @@ export class DatabaseService {
     if (snapshot.length === 0) return [];
 
     const id = snapshot[0].id;
-    const registros = await db.select<any[]>(`
+    const pedidosDeTrabajo = await db.select<any[]>(`
         SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos, fecha
-        FROM registros WHERE snapshot_id = $1`, [id]);
+        FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
     
-    return registros.map(r => ({
+    return pedidosDeTrabajo.map(r => ({
         planta: r.planta,
         ot: r.ot,
+        nroActivo: r.nro_activo,
         descripcion: r.descripcion,
         estado: r.estado,
         clasificacion: r.clasificacion,
-        // CORRECCIÓN CRÍTICA
         esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
         periodo: r.periodo,
         semana: r.semana,
@@ -222,22 +210,23 @@ export class DatabaseService {
 
     const id = snapshot[0].id;
     // SOLO TRAEMOS LO NECESARIO PARA EL CRUCE DE FLUJO
-    const registros = await db.select<any[]>(`
+    const pedidosDeTrabajo = await db.select<any[]>(`
         SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana 
-        FROM registros WHERE snapshot_id = $1`, [id]);
+        FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
     
-    return registros.map(r => ({
+    return pedidosDeTrabajo.map(r => ({
         planta: r.planta,
         ot: r.ot,
+        nroActivo: r.nro_activo,
         descripcion: r.descripcion,
         estado: r.estado,
         clasificacion: r.clasificacion,
         esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
         periodo: r.periodo,
         semana: r.semana,
-        rmd: "", // No necesario para comparar
-        rse: "", // No necesario para comparar
-        detallesTecnicos: [] // Ahorramos el JSON.parse masivo aquí
+        rmd: "",
+        rse: "",
+        detallesTecnicos: []
     }));
   }
 

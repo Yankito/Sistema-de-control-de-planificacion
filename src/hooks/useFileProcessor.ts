@@ -28,7 +28,6 @@ export const useFileProcessor = ({
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Set loading state
         setLoading(prev => ({ ...prev, [tipo.toLowerCase()]: true }));
 
         const reader = new FileReader();
@@ -42,23 +41,12 @@ export const useFileProcessor = ({
                         onPlanLoaded(workbook);
                     } 
                     else if (tipo === 'SEGUIMIENTO') {
-                        const { actual, activos, masivoRaw, cumplimientoRaw } = processSeguimientoOTs(workbook.Sheets);
+                        const { actual, activos, cumplimientoRaw } = processSeguimientoOTs(workbook.Sheets);
                         
                         if (activos.length) await DatabaseService.guardarActivos(activos);
                         await DatabaseService.guardarSnapshot(targetWeek, 'SEGUIMIENTO', actual);
-                        if (masivoRaw.length) await DatabaseService.guardarMasivoRaw(targetWeek, masivoRaw);
-                        
-                        if (cumplimientoRaw.length) {
-                            await DatabaseService.guardarCumplimientoRaw(targetWeek, cumplimientoRaw);
-                            // Crear snapshot UI rápido
-                            const snapshotCumple = cumplimientoRaw.map(c => ({
-                                planta: c.planta, ot: c.nro_ot, descripcion: "Desde Cumplimiento",
-                                estado: c.estado_om, clasificacion: "CUMPLIDA" as const, esOB: c.tipo.includes("OB"),
-                                periodo: targetWeek.split('-')[0], semana: targetWeek, rmd: "SI", rse: "SI", detallesTecnicos: []
-                            }));
-                            await DatabaseService.guardarSnapshot(targetWeek, 'CUMPLIMIENTO', snapshotCumple);
-                        }
-                        
+                        if (cumplimientoRaw.length) await DatabaseService.guardarCumplimientoRaw(targetWeek, cumplimientoRaw);
+
                         onSeguimientoLoaded();
                         setActiveTab("seguimiento");
                     }
@@ -79,8 +67,5 @@ export const useFileProcessor = ({
         reader.readAsArrayBuffer(file);
     };
 
-    return {
-        handleFileUpload,
-        loading
-    };
+    return { handleFileUpload, loading };
 };

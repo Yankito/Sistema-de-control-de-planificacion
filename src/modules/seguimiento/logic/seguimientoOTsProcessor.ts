@@ -131,26 +131,28 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
 
   hojasPlantas.forEach(nombreHoja => {
     if (!sheets[nombreHoja]) return;
-    // FIX: Agregado defval aquí también
     const dfPlanta = normalizarColumnas(XLSX.utils.sheet_to_json(sheets[nombreHoja], { defval: "" }));
 
     dfPlanta.forEach(fila => {
       const nroOT = String(fila["PEDIDO DE TRABAJO"] || "").trim();
       if (!nroOT || otsProcesadasEnCiclo.has(nroOT)) return;
+      
       const estado = String(fila["ESTADO"] || "").trim();
       if (!estadosInteres.includes(estado)) return;
       
       const descripcion = String(fila["DESCRIPCIÓN"] || "").trim();
+      const nroActivo = String(fila["NÚMERO DE ACTIVO"] || "").trim();
+      
       otsProcesadasEnCiclo.add(nroOT);
 
       const infoCumple = mapaCumplimiento.get(nroOT);
       const infoMasivo = masivoLookup.get(nroOT);
 
-      // LÓGICA RMD/RSE: Si no está en masivo es N/A.
       const valRmd = infoMasivo ? infoMasivo.rmd : "N/A";
       const valRse = infoMasivo ? infoMasivo.rse : "N/A";
 
-      let clasificacion: any;
+      // Lógica de clasificación
+      let clasificacion: AtrasoRow['clasificacion'];
       if (estadosFinalizados.includes(estado)) { 
           clasificacion = "CUMPLIDA"; 
       } else {
@@ -159,21 +161,18 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
         } else if (!infoCumple.total) {
             clasificacion = "TECNICO / SERVICIO";
         } else if (!infoMasivo) {
-            clasificacion = "OC / OTRO"; // No está en masivo
+            clasificacion = "OC / OTRO"; 
         } else {
-            // "SI", "0" o vacío cuentan como OK
             const rmdOk = valRmd === "SI" || valRmd === "" || valRmd === "0";
             const rseOk = valRse === "SI" || valRse === "" || valRse === "0";
-            
             clasificacion = (rmdOk && rseOk) ? "PROGRAMADOR" : "OC / OTRO";
         }
       }
 
-      // Lógica Planta (MP3 -> Activos)
+      // Lógica de Planta Real (MP3 -> Activos)
       let plantaReal = nombreHoja;
       if (nombreHoja === "MP3") {
-        const nroActivoFull = String(fila["NÚMERO DE ACTIVO"] || "");
-        const matchCC = nroActivoFull.match(/\((\d)(\d{3})\)/);
+        const matchCC = nroActivo.match(/\((\d)(\d{3})\)/);
         if (matchCC) {
             const ccPuro = matchCC[1] + matchCC[2];
             const activoFound = listaActivos.find(a => a.codigo === ccPuro);
@@ -185,33 +184,60 @@ export const processSeguimientoOTs = (sheets: { [key: string]: XLSX.WorkSheet })
         }
       }
 
+      // --- TRATAMIENTO DE FECHA Y SEMANA ---
       const fechaRaw = fila["FECHA INICIAL PROGRAMADA"];
       let periodo = "S/A";
       let semana = "S/D";
       let fechaFormateada = "";
 
       if (fechaRaw) {
-        const fecha = new Date((Number(fechaRaw) - 25569) * 86400 * 1000);
-        semana = getWeekLabel(fecha); 
-        periodo = getPeriodoLabel(fecha); 
+        let dateObj: Date;
+        // Si Excel lo envía como número (serial)
+        if (typeof fechaRaw === 'number') {
+            dateObj = new Date((fechaRaw - 25569) * 86400 * 1000);
+        } else {
+            // Si viene como string "14/05/2025 9:42:15", limpiamos la hora
+            const dateStr = String(fechaRaw).split(" ")[0];
+            const [d, m, y] = dateStr.split("/");
+            dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+        }
 
-        fechaFormateada = fecha.toLocaleDateString('es-ES', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric' 
-        });
+        if (!isNaN(dateObj.getTime())) {
+            semana = getWeekLabel(dateObj); 
+            periodo = getPeriodoLabel(dateObj); 
+            fechaFormateada = dateObj.toLocaleDateString('es-ES', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric' 
+            });
+        }
       }
 
       const esOB = nroOT.toUpperCase().startsWith("OB");
 
       resultados.push({
-        planta: plantaReal, ot: nroOT, descripcion, estado, clasificacion, 
-        periodo, semana, esOB, fecha: fechaFormateada,
+        planta: plantaReal, 
+        ot: nroOT, 
+        nroActivo: nroActivo,
+        descripcion, 
+        estado, 
+        clasificacion, 
+        periodo, 
+        semana, 
+        esOB, 
+        fecha: fechaFormateada,
         detallesTecnicos: infoCumple?.tecnicos || [], 
-        rmd: valRmd, rse: valRse
+        rmd: valRmd, 
+        rse: valRse
       });
     });
   });
 
-  return { actual: resultados, anterior: dataAnterior, activos: listaActivos, masivoRaw: rawMasivoData, cumplimientoRaw: rawCumplimientoData };
+  return { 
+    actual: resultados, 
+    anterior: dataAnterior, 
+    activos: listaActivos, 
+    masivoRaw: rawMasivoData, 
+    cumplimientoRaw: rawCumplimientoData 
+  };
 };

@@ -55,9 +55,9 @@ describe('OTCard Component (UI)', () => {
         expect(handleSelect).toHaveBeenCalledWith("JUAN PEREZ");
     });
 
-    it('debe mostrar la clasificación con el color correcto (Programador = Verde)', () => {
+    it('debe mostrar la clasificación con el color correcto (Programador = Morado)', () => {
         render(<OTCard item={mockItem} />);
         const badge = screen.getByText("PROGRAMADOR");
-        expect(badge).toHaveClass("bg-green-100");
+        expect(badge).toHaveClass("bg-purple-100");
     });
 });
