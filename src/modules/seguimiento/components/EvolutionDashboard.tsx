@@ -21,31 +21,31 @@ export const EvolutionDashboard = ({ nuevas, finalizadas, conAvance, semanaActua
         <ArrowRightCircle className="text-purple-600" />
         <h3 className="text-lg font-black uppercase text-slate-700">Flujo de OTs</h3>
         <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-            {semanaAnterior} <ArrowRight size={10} className="inline"/> {semanaActual}
+          {semanaAnterior} <ArrowRight size={10} className="inline" /> {semanaActual}
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <EvolutionGroup 
-            title="Nuevas Entradas" 
-            sublabel="OTs que no existían la semana pasada"
-            data={nuevas} 
-            color="red" 
-            icon={PlusCircle} 
+        <EvolutionGroup
+          title="Nuevas Entradas"
+          sublabel="OTs que no existían la semana pasada"
+          data={nuevas}
+          color="red"
+          icon={PlusCircle}
         />
-        <EvolutionGroup 
-            title="Salieron / Finalizadas" 
-            sublabel="OTs que finalizaron"
-            data={finalizadas} 
-            color="green" 
-            icon={CheckCircle2} 
+        <EvolutionGroup
+          title="Salieron / Finalizadas"
+          sublabel="OTs que finalizaron"
+          data={finalizadas}
+          color="green"
+          icon={CheckCircle2}
         />
-        <EvolutionGroup 
-            title="Cambio de Clasificación"
-            sublabel="OTs atrasadas que cambiaron de clasificación"
-            data={conAvance} 
-            color="blue" 
-            icon={ArrowRightCircle} 
+        <EvolutionGroup
+          title="Cambio de Clasificación"
+          sublabel="OTs atrasadas que cambiaron de clasificación"
+          data={conAvance}
+          color="blue"
+          icon={ArrowRightCircle}
         />
       </div>
     </div>

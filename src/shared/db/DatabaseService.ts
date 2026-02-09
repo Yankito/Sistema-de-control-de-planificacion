@@ -10,7 +10,7 @@ export class DatabaseService {
     if (!this.db) {
       this.db = await Database.load(DB_NAME);
       
-      // 1. SNAPSHOTS (Se mantiene igual)
+      // SNAPSHOTS
       await this.db.execute(`
         CREATE TABLE IF NOT EXISTS snapshots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +43,7 @@ export class DatabaseService {
         );
       `);
 
-      // 3. ACTIVOS (Se mantiene igual)
+      // 3. ACTIVOS
       await this.db.execute(`
         CREATE TABLE IF NOT EXISTS activos (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,13 +74,13 @@ export class DatabaseService {
     return this.db;
   }
 
-  // --- GESTIÓN DE SNAPSHOTS GENÉRICA ---
+  // GESTIÓN DE SNAPSHOTS GENÉRICA
   static async deleteSnapshot(semana: string, tipo: string) {
     const db = await this.init();
     await db.execute("DELETE FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
   }
 
-  // --- GUARDAR REPORTE PROCESADO ---
+  // GUARDAR REPORTE PROCESADO
   static async guardarSnapshot(semana: string, tipo: string, data: any[]) {
     const db = await this.init();
     
@@ -132,7 +132,7 @@ export class DatabaseService {
     }
   }
 
-  // --- NUEVO: GUARDAR CUMPLIMIENTO RAW ---
+  // NUEVO: GUARDAR CUMPLIMIENTO RAW
   static async guardarCumplimientoRaw(semana: string, data: CumplimientoRow[]) {
     const db = await this.init();
     const existe = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = 'CUMPLIMIENTO'", [semana]);
@@ -236,7 +236,7 @@ export class DatabaseService {
       return rows.map(r => r.semana);
   }
 
-  // --- GESTIÓN DE ACTIVOS (Sin Cambios) ---
+  // GESTIÓN DE ACTIVOS (Sin Cambios)
   static async guardarActivos(activos: ActivoRow[]) {
     if (activos.length === 0) return;
     const db = await this.init();

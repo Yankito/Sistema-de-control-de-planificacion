@@ -1,11 +1,11 @@
 import { UploadCloud, CheckCircle2, Download } from "lucide-react";
 import { useState, useRef } from "react";
 
-import { 
-  descargarPlantillaPlan, 
-  descargarPlantillaFallas, 
+import {
+  descargarPlantillaPlan,
+  descargarPlantillaFallas,
   descargarPlantillaAtrasos,
-  descargarPlantillaSimple 
+  descargarPlantillaSimple
 } from "../../modules/seguimiento/logic/templateGenerator";
 import { FileType } from "./FileUploader";
 
@@ -19,7 +19,7 @@ interface UploadCardProps {
   bgClass: string;
   isUploaded: boolean;
   isLoading: boolean;
-  isHighlighted: boolean; 
+  isHighlighted: boolean;
   onUpload: (e: any, tipo: FileType) => void;
 }
 
@@ -28,11 +28,11 @@ const SIMPLE_TEMPLATES: Record<string, string[]> = {
   SEGUIMIENTO: ["Orden", "Estado", "Texto breve", "Ubicac.técnica"]
 };
 
-export const UploadCard = ({ 
-  label, sublabel, type, icon: Icon, 
-  colorClass, bgClass, isUploaded, isLoading, isHighlighted, onUpload 
+export const UploadCard = ({
+  label, sublabel, type, icon: Icon,
+  colorClass, bgClass, isUploaded, isLoading, isHighlighted, onUpload
 }: UploadCardProps) => {
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +62,7 @@ export const UploadCard = ({
   };
 
   const handleDownloadClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     switch (type) {
       case 'PLAN': descargarPlantillaPlan(); break;
       case 'FALLAS': descargarPlantillaFallas(); break;
@@ -90,12 +90,12 @@ export const UploadCard = ({
         relative overflow-hidden rounded-2xl p-4 border-2 transition-all duration-500 cursor-pointer group h-full flex flex-col justify-between
         ${isLoading ? 'opacity-50 cursor-wait' : ''}
         
-        ${isUploaded 
-          ? `bg-white border-${bgClass.split('-')[1]}-500 shadow-md` 
+        ${isUploaded
+          ? `bg-white border-${bgClass.split('-')[1]}-500 shadow-md`
           : isHighlighted
             ? `border-${bgClass.split('-')[1]}-500 bg-${bgClass.split('-')[1]}-50 scale-105 shadow-xl ring-4 ring-${bgClass.split('-')[1]}-200 ring-offset-2 z-10`
-            : isDragging 
-              ? `border-${bgClass.split('-')[1]}-500 bg-${bgClass.split('-')[1]}-50` 
+            : isDragging
+              ? `border-${bgClass.split('-')[1]}-500 bg-${bgClass.split('-')[1]}-50`
               : 'border-dashed border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
         }
       `}
@@ -107,21 +107,21 @@ export const UploadCard = ({
         `}>
           {isUploaded ? <CheckCircle2 size={24} /> : <Icon size={24} />}
         </div>
-        
+
         <div className="flex flex-col items-end gap-1">
-            {isUploaded ? (
-                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full bg-green-100 text-green-700`}>
-                    Listo
-                </span>
-            ) : (
-                <button 
-                    onClick={handleDownloadClick}
-                    title="Descargar Plantilla Excel"
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-pf-red hover:bg-red-50 transition-colors z-20"
-                >
-                    <Download size={16} />
-                </button>
-            )}
+          {isUploaded ? (
+            <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full bg-green-100 text-green-700`}>
+              Listo
+            </span>
+          ) : (
+            <button
+              onClick={handleDownloadClick}
+              title="Descargar Plantilla Excel"
+              className="p-1.5 rounded-lg text-slate-300 hover:text-pf-red hover:bg-red-50 transition-colors z-20"
+            >
+              <Download size={16} />
+            </button>
+          )}
         </div>
       </div>
 

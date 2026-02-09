@@ -1,12 +1,11 @@
 // components/Sidebar.tsx
 import { useState, useEffect, useMemo } from "react";
-import { 
-  LayoutDashboard, Calendar, CalendarCheck, RotateCcw, Clock, 
-  ClipboardList, BarChart2, ChevronLeft, ChevronRight, Briefcase, ChevronDown 
+import {
+  LayoutDashboard, Calendar, CalendarCheck, RotateCcw, Clock,
+  ClipboardList, BarChart2, ChevronLeft, ChevronRight, Briefcase, ChevronDown
 } from "lucide-react";
-import { SidebarItem } from "./SidebarItem"; // Importa el componente de arriba
+import { SidebarItem } from "./SidebarItem";
 
-// Definimos tipos estrictos
 interface SidebarProps {
   archivoCargado: boolean;
   tieneSeguimiento: boolean;
@@ -16,7 +15,7 @@ interface SidebarProps {
   onLimpiar: () => void;
 }
 
-export const Sidebar = ({ 
+export const Sidebar = ({
   archivoCargado, tieneSeguimiento, tieneFallas,
   activeTab, setActiveTab, onLimpiar
 }: SidebarProps) => {
@@ -26,7 +25,6 @@ export const Sidebar = ({
 
   const hayDatos = archivoCargado || tieneSeguimiento || tieneFallas;
 
-  // Memoizamos la estructura para evitar recrearla en cada render
   const menuStructure = useMemo(() => [
     { type: 'link', id: 'dash', label: 'Dashboard', icon: LayoutDashboard, locked: false },
     {
@@ -61,8 +59,8 @@ export const Sidebar = ({
 
   return (
     <aside className={`bg-pf-sidebar border-r border-pf-border flex flex-col h-full shadow-sm transition-all duration-300 relative z-50 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-      
-      {/* --- TOGGLE BUTTON --- */}
+
+      {/* TOGGLE BUTTON */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-9 bg-white border border-pf-border rounded-full p-1 text-slate-400 hover:text-pf-red shadow-sm z-50 transition-colors"
@@ -70,12 +68,12 @@ export const Sidebar = ({
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className={`p-6 flex flex-col items-center transition-all duration-300 ${isCollapsed ? 'px-2' : ''}`}>
-        <img 
-          src="./Logo_PF_Alimentos.png" 
-          alt="PF Logo" 
-          className={`object-contain transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-32 mb-4'}`} 
+        <img
+          src="./Logo_PF_Alimentos.png"
+          alt="PF Logo"
+          className={`object-contain transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-32 mb-4'}`}
         />
         <div className={`h-0.5 w-16 bg-pf-red/20 rounded-full transition-opacity duration-200 ${isCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}></div>
         <p className={`text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold text-center mt-2 whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? 'opacity-0 h-0' : 'opacity-100 h-auto'}`}>
@@ -83,10 +81,10 @@ export const Sidebar = ({
         </p>
       </div>
 
-      {/* --- MENU NAV --- */}
+      {/* MENU NAV */}
       <nav className="flex-1 px-3 space-y-1.5 overflow-x-hidden overflow-y-auto custom-scrollbar">
         {menuStructure.map((item: any) => {
-          
+
           // RENDER: GRUPO
           if (item.type === 'group') {
             const isOpen = openGroups.includes(item.id);
@@ -94,7 +92,7 @@ export const Sidebar = ({
 
             return (
               <div key={item.id} className="mb-2">
-                {/* Cabecera del Grupo (Reutilizamos lógica visual manual aquí porque tiene Chevron) */}
+                {/* Cabecera del Grupo */}
                 <button
                   onClick={() => !item.locked && toggleGroup(item.id)}
                   disabled={item.locked}
@@ -153,7 +151,7 @@ export const Sidebar = ({
           );
         })}
 
-        {/* --- BOTÓN REINICIAR --- */}
+        {/* BOTÓN REINICIAR */}
         {hayDatos && (
           <div className="pt-4 mt-4 border-t border-pf-border/50">
             <SidebarItem
@@ -169,7 +167,7 @@ export const Sidebar = ({
         )}
       </nav>
 
-      {/* --- FOOTER STATUS --- */}
+      {/* FOOTER STATUS */}
       <div className={`border-t border-pf-border transition-all duration-300 ${isCollapsed ? 'p-3' : 'p-6'}`}>
         <div className={`flex items-center bg-slate-50 rounded-xl border border-pf-border transition-all duration-300 ${isCollapsed ? 'justify-center p-2 aspect-square' : 'space-x-3 p-3'}`}>
           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${hayDatos ? 'bg-green-500 shadow-green-200 shadow-md' : 'bg-slate-300'}`}></div>

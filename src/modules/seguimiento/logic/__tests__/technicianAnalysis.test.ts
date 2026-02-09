@@ -65,4 +65,27 @@ describe('prepareEmployeeProfile (Detalle Individual)', () => {
         expect(result.orders[0].ot).toBe("OT-100");
         expect(result.stats.pendientes).toBe(1);
     });
+
+    it('debe marcar como pendiente si OP_FINALIZADA es NO, aunque la OT exista en cumplimiento', () => {
+        const dataConPendiente = [
+            {
+                ot: "OT-TEST-01",
+                planta: "PF1",
+                descripcion: "Tarea de prueba",
+                estado: "Liberado",
+                detallesTecnicos: [{ tecnico: "PEDRO SOTO", finalizada: false }], // Operación NO finalizada
+                clasificacion: "TECNICO / SERVICIO" as const,
+                periodo: "2026",
+                semana: "2026-S06",
+                esOB: false
+            }
+        ];
+
+        const stats = analyzeTechnicians([], dataConPendiente);
+        const pedro = stats.find(t => t.nombre === "PEDRO SOTO");
+
+        expect(pedro?.finalizadas).toBe(0);
+        expect(pedro?.pendientes).toBe(1);
+        expect(pedro?.efectividad).toBe(0);
+    });
 });

@@ -18,14 +18,14 @@ export interface BacklogStats {
 }
 
 const normalizeKey = (val: any): string => {
-    if (val === null || val === undefined) return "";
-    return String(val).trim().toUpperCase();
+  if (val === null || val === undefined) return "";
+  return String(val).trim().toUpperCase();
 };
 
 export const analyzeBacklogFlow = (
-    currentBacklog: AtrasoRow[], 
-    prevBacklog: AtrasoRow[],
-    currentCumplimiento: AtrasoRow[] = [] 
+  currentBacklog: AtrasoRow[], 
+  prevBacklog: AtrasoRow[],
+  currentCumplimiento: AtrasoRow[] = [] 
 ): BacklogStats => {
   
   const mapPrev = new Map<string, AtrasoRow>();
@@ -37,81 +37,80 @@ export const analyzeBacklogFlow = (
   currentCumplimiento.forEach(d => mapCurrCumplimiento.set(normalizeKey(d.ot), d));
 
   const stats: BacklogStats = {
-    nuevas: [],
-    finalizadas: [],
-    sinCambios: [],
-    conAvance: [],
-    desaparecidas: []
+  nuevas: [],
+  finalizadas: [],
+  sinCambios: [],
+  conAvance: [],
+  desaparecidas: []
   };
 
-  // 1. BACKLOG ACTUAL (Nuevas y Cambios de Clasificación)
+  // BACKLOG ACTUAL (Nuevas y Cambios de Clasificación)
   currentBacklog.forEach(curr => {
-    const key = normalizeKey(curr.ot);
-    const prev = mapPrev.get(key);
-    
-    // Si la clasificación es CUMPLIDA, es finalizada (aunque esté en el Excel de atrasos)
-    if (curr.clasificacion === 'CUMPLIDA') {
-        stats.finalizadas.push({
-            ot: curr.ot,
-            descripcion: curr.descripcion,
-            planta: curr.planta,
-            estadoActual: curr.estado, // Aquí sí mostramos el estado final (ej: Finalizado)
-            tipoMovimiento: "FINALIZADA"
-        });
-        return;
-    }
-
-    const item: OTFlowResult = {
+  const key = normalizeKey(curr.ot);
+  const prev = mapPrev.get(key);
+  
+  // Si la clasificación es CUMPLIDA, es finalizada (aunque esté en el Excel de atrasos)
+  if (curr.clasificacion === 'CUMPLIDA') {
+    stats.finalizadas.push({
       ot: curr.ot,
       descripcion: curr.descripcion,
       planta: curr.planta,
-      estadoActual: curr.clasificacion, // Mostramos Clasificación
-      estadoAnterior: prev ? prev.clasificacion : undefined, // Mostramos Clasificación
-      tipoMovimiento: "NUEVA"
-    };
+      estadoActual: curr.estado, // Aquí sí mostramos el estado final (ej: Finalizado)
+      tipoMovimiento: "FINALIZADA"
+    });
+    return;
+  }
 
-    if (!prev) {
-        // NUEVA
-        item.tipoMovimiento = "NUEVA";
-        stats.nuevas.push(item);
+  const item: OTFlowResult = {
+    ot: curr.ot,
+    descripcion: curr.descripcion,
+    planta: curr.planta,
+    estadoActual: curr.clasificacion, // Mostramos Clasificación
+    estadoAnterior: prev ? prev.clasificacion : undefined, // Mostramos Clasificación
+    tipoMovimiento: "NUEVA"
+  };
+
+  if (!prev) {
+    // NUEVA
+    item.tipoMovimiento = "NUEVA";
+    stats.nuevas.push(item);
+  } else {
+    // Verificamos si cambió la CLASIFICACIÓN
+    if (prev.clasificacion !== curr.clasificacion) {
+      item.tipoMovimiento = "CAMBIO_ESTADO";
+      stats.conAvance.push(item);
     } else {
-        // PERSISTENTE: Verificamos si cambió la CLASIFICACIÓN (El verdadero avance)
-        if (prev.clasificacion !== curr.clasificacion) {
-            item.tipoMovimiento = "CAMBIO_ESTADO";
-            stats.conAvance.push(item);
-        } else {
-            item.tipoMovimiento = "PERSISTENTE";
-            stats.sinCambios.push(item);
-        }
+      item.tipoMovimiento = "PERSISTENTE";
+      stats.sinCambios.push(item);
     }
+  }
   });
 
-  // 2. BACKLOG ANTERIOR (Salidas)
+  // BACKLOG ANTERIOR (Salidas)
   prevBacklog.forEach(prev => {
-    const key = normalizeKey(prev.ot);
-    
+  const key = normalizeKey(prev.ot);
     if (!mapCurrBacklog.has(key)) {
-        const enCumplimiento = mapCurrCumplimiento.get(key);
+      const enCumplimiento = mapCurrCumplimiento.get(key);
 
-        if (enCumplimiento) {
-            stats.finalizadas.push({
-                ot: prev.ot,
-                descripcion: prev.descripcion,
-                planta: prev.planta,
-                estadoAnterior: prev.clasificacion, // Clasificación que tenía antes
-                estadoActual: enCumplimiento.estado, // Estado real de cierre (ej: Cierre Técnico)
-                tipoMovimiento: "FINALIZADA"
-            });
-        } else {
-            stats.desaparecidas.push({
-                ot: prev.ot,
-                descripcion: prev.descripcion,
-                planta: prev.planta,
-                estadoAnterior: prev.clasificacion,
-                estadoActual: "NO EN REPORTE",
-                tipoMovimiento: "DESAPARECIDA"
-            });
-        }
+      if (enCumplimiento) {
+        stats.finalizadas.push({
+          ot: prev.ot,
+          descripcion: prev.descripcion,
+          planta: prev.planta,
+          estadoAnterior: prev.clasificacion, // Clasificación que tenía antes
+          estadoActual: enCumplimiento.estado, // Estado real de cierre
+          tipoMovimiento: "FINALIZADA"
+        });
+      } else {
+        stats.desaparecidas.push({
+          ot: prev.ot,
+          descripcion: prev.descripcion,
+          planta: prev.planta,
+          estadoAnterior: prev.clasificacion,
+          estadoActual: "NO EN REPORTE",
+          tipoMovimiento: "DESAPARECIDA"
+        });
+      }
     }
   });
 

@@ -95,4 +95,29 @@ describe('Seguimiento OTs Processor', () => {
         const result = processSeguimientoOTs(sheets);
         expect(result.actual).toHaveLength(0);
     });
+
+    it('debe clasificar como esOB = true si la descripción contiene el tag (INFRA) aunque no tenga prefijo OB', () => {
+        // OT solo con número (sin prefijo OB)
+        const sheetPF1 = crearHoja([
+            { 
+                "Pedido de Trabajo": "9000123", 
+                "Estado": "Liberado", 
+                "Descripción": "REPARACION TECHOS (INFRA)", 
+                "Fecha Inicial Programada": 45325 
+            }
+        ]);
+
+        const sheets = {
+            "PF1": sheetPF1,
+            "CUMPLIMIENTO": crearHoja([]),
+            "MASIVO": crearHoja([])
+        };
+
+        const result = processSeguimientoOTs(sheets);
+        const ot = result.actual[0];
+
+        // Verificamos que la lógica de Regex funcionó
+        expect(ot.esOB).toBe(true);
+        expect(ot.ot).toBe("9000123");
+    });
 });

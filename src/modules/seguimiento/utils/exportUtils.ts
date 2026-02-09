@@ -1,215 +1,265 @@
-import * as XLSX from "xlsx-js-style"; 
+import * as XLSX from "xlsx-js-style";
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import { AtrasoRow } from "../types";
 
-// --- CONSTANTES ---
+// CONSTANTES
 const PLANTAS_INDIVIDUALES = ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "MPS", "DC", "VENTAS", "OTROS"];
 const CATEGORIAS = ["TECNICO / SERVICIO", "PROGRAMADOR", "OC / OTRO"];
 
 const DEFINICION_GRUPOS = {
-    "COMPLEJO": ["PF3", "PF4", "PF5", "PF6", "CDT", "DC", "VENTAS", "OTROS"], 
-    "PF ALIMENTOS": ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "DC", "VENTAS", "OTROS"] 
+  "COMPLEJO": ["PF3", "PF4", "PF5", "PF6", "CDT", "DC", "VENTAS", "OTROS"],
+  "PF ALIMENTOS": ["PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "CDT", "DC", "VENTAS", "OTROS"]
 };
 
-// --- ESTILOS VISUALES ---
+// ESTILOS VISUALES
 const BORDER_ALL = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+// Nuevo estilo para la separación de años
+const BORDER_2025_RIGHT = { ...BORDER_ALL, right: { style: "medium" } };
 
 const STYLE_HEADER_MAIN = {
-    fill: { fgColor: { rgb: "FFFF00" } }, 
-    font: { bold: true },
-    alignment: { horizontal: "center" },
-    border: BORDER_ALL
+  fill: { fgColor: { rgb: "FFFF00" } },
+  font: { bold: true },
+  alignment: { horizontal: "center" },
+  border: BORDER_ALL
 };
 
-// --- LÓGICA DE COLORES DEL SEMÁFORO ---
-const getTrafficLightStyle = (current: number, previous: number, isBold: boolean = false) => {
-    let color = "FFFF99"; // Amarillo (Igual)
-    if (current > previous) color = "FF8888"; // Rojo (Subió - Malo)
-    if (current < previous) color = "90EE90"; // Verde (Bajó - Bueno)
+// LÓGICA DE COLORES DEL SEMÁFORO
+const getTrafficLightStyle = (current: number, previous: number, isBold: boolean = false, extraBorder?: any) => {
+  let color = "FFFF99";
+  if (current > previous) color = "FF8888";
+  if (current < previous) color = "90EE90";
 
-    return {
-        fill: { fgColor: { rgb: color } },
-        font: { bold: isBold },
-        alignment: { horizontal: "center" },
-        border: BORDER_ALL
-    };
+  return {
+    fill: { fgColor: { rgb: color } },
+    font: { bold: isBold },
+    alignment: { horizontal: "center" },
+    border: extraBorder || BORDER_ALL
+  };
 };
 
 const getColLetter = (colIndex: number) => {
-    let letter = '';
-    let temp = colIndex + 1; 
-    while (temp > 0) {
-        let mod = (temp - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        temp = Math.floor((temp - mod) / 26);
-    }
-    return letter;
+  let letter = '';
+  let temp = colIndex + 1;
+  while (temp > 0) {
+    let mod = (temp - 1) % 26;
+    letter = String.fromCharCode(65 + mod) + letter;
+    temp = Math.floor((temp - mod) / 26);
+  }
+  return letter;
 };
 
-// Helpers de Conteo
+// Helpers de Conteo - ACTUALIZADO para filtrar por 2026 en totales
 const count = (data: AtrasoRow[], planta: string | string[], esOB: boolean, periodo: string, cat?: string) => {
-    return data.filter(d => {
-        const matchPlanta = Array.isArray(planta) ? planta.includes(d.planta) : d.planta === planta;
-        const matchTipo = d.esOB === esOB;
-        const matchPeriodo = d.periodo === periodo;
-        const matchCat = cat ? d.clasificacion === cat : true;
-        return matchPlanta && matchTipo && matchPeriodo && matchCat;
-    }).length;
+  return data.filter(d => {
+    const matchPlanta = Array.isArray(planta) ? planta.includes(d.planta) : d.planta === planta;
+    const matchTipo = d.esOB === esOB;
+    const matchPeriodo = d.periodo === periodo;
+    const matchCat = cat ? d.clasificacion === cat : true;
+    return matchPlanta && matchTipo && matchPeriodo && matchCat;
+  }).length;
 };
 
-const countTotal = (data: AtrasoRow[], planta: string | string[], esOB: boolean, cat?: string) => {
-    return data.filter(d => {
-        const matchPlanta = Array.isArray(planta) ? planta.includes(d.planta) : d.planta === planta;
-        const matchTipo = d.esOB === esOB;
-        const matchCat = cat ? d.clasificacion === cat : true;
-        return matchPlanta && matchTipo && matchCat;
-    }).length;
-};
 
-// --- FUNCIÓN 1: EXPORTAR REPORTE COMPLETO ---
 export const exportarReporteCompleto = async (
-    dataActual: AtrasoRow[], 
-    dataAnterior: AtrasoRow[], 
-    modoVista: "ATRASOS" | "CUMPLIDAS", 
-    reporteActual: string
+  dataActual: AtrasoRow[],
+  dataAnterior: AtrasoRow[],
+  modoVista: "ATRASOS" | "CUMPLIDAS",
+  reporteActual: string
 ) => {
-    const datasetAct = dataActual.filter(d => modoVista === "CUMPLIDAS" ? d.clasificacion === "CUMPLIDA" : d.clasificacion !== "CUMPLIDA");
-    const datasetAnt = dataAnterior.filter(d => modoVista === "CUMPLIDAS" ? d.clasificacion === "CUMPLIDA" : d.clasificacion !== "CUMPLIDA");
-    
-    if (datasetAct.length === 0) return;
+  const datasetAct = dataActual.filter(d => modoVista === "CUMPLIDAS" ? d.clasificacion === "CUMPLIDA" : d.clasificacion !== "CUMPLIDA");
+  const datasetAnt = dataAnterior.filter(d => modoVista === "CUMPLIDAS" ? d.clasificacion === "CUMPLIDA" : d.clasificacion !== "CUMPLIDA");
 
-    try {
-        const wb = XLSX.utils.book_new();
-        // Obtenemos periodos de ambos para asegurar que la comparativa no falle si falta un mes en uno
-        const periodosRaw = Array.from(new Set([...datasetAct.map(d => d.periodo), ...datasetAnt.map(d => d.periodo)]))
-            .filter(p => p !== "S/A" && p !== "S/D")
-            .sort();
-            
-        const columnasPeriodos = [...periodosRaw]; 
-        const headersLabels = [`REPORTE ${modoVista}`, ...columnasPeriodos, "TOTAL ACT.", "TOTAL ANT.", "DELTA"];
+  if (datasetAct.length === 0) return;
 
-        const headerRow = headersLabels.map(label => ({ v: label, t: 's', s: STYLE_HEADER_MAIN }));
-        const matrix: any[][] = [];
-        const rowMap = new Map<string, number>();
+  try {
+    const wb = XLSX.utils.book_new();
+    const periodosRaw = Array.from(new Set([...datasetAct.map(d => d.periodo), ...datasetAnt.map(d => d.periodo)]))
+      .filter(p => p !== "S/A" && p !== "S/D")
+      .sort();
 
-        matrix.push(headerRow);
-        let currentRowIndex = 2;
+    // DETECCIÓN DINÁMICA DE AÑO
+    const anioFull = reporteActual.split('-')[0]; // "2026"
+    const anioShort = anioFull.slice(-2);        // "26"
+    const columnasPeriodos = [...periodosRaw];
 
-        const ordenGrupos = [
-            ...PLANTAS_INDIVIDUALES.map(p => ({ label: p, id: p, isAgrupado: false })),
-            { label: "COMPLEJO", id: "COMPLEJO", isAgrupado: true },
-            { label: "PF ALIMENTOS", id: "PF ALIMENTOS", isAgrupado: true }
-        ];
+    // Buscar la frontera: El último periodo que NO sea del año actual (ni 2026 ni -26)
+    const idxUltimoAnioAnterior = columnasPeriodos.findLastIndex(p =>
+      !p.includes(anioFull) && !p.endsWith(`-${anioShort}`)
+    );
 
-        const colIdxTotalAct = columnasPeriodos.length + 1; 
-        const colIdxTotalAnt = colIdxTotalAct + 1;
-        const letraTotalAct = getColLetter(colIdxTotalAct);
-        const letraTotalAnt = getColLetter(colIdxTotalAnt);
+    // Labels Dinámicos
+    const headersLabels = [
+      `REPORTE ${modoVista}`,
+      ...columnasPeriodos,
+      `TOTAL ${anioFull}`,
+      `TOTAL ${anioFull} S/A`,
+      "DELTA"
+    ];
 
-        [false, true].forEach(esOB => {
-            const suffix = esOB ? "OB" : "OM";
-            const suffixDisplay = esOB ? "(OB)" : "(OM)";
+    // Letras para fórmulas SUM (Solo meses del año actual)
+    const indicesAnioActual = columnasPeriodos
+      .map((p, idx) => (p.includes(anioFull) || p.endsWith(`-${anioShort}`)) ? idx + 1 : -1)
+      .filter(idx => idx !== -1);
 
-            ordenGrupos.forEach(grupo => {
-                const rowCells: any[] = [];
-                let valTotalAct = 0; 
-                let valTotalAnt = 0;
-                
-                rowCells.push({ v: `${grupo.label} ${suffixDisplay}`, t: 's', s: { font: { bold: true }, border: BORDER_ALL, fill: { fgColor: { rgb: "FFFFE0" } } } });
-                
-                columnasPeriodos.forEach((per, colIdx) => {
-                    const excelColLetter = getColLetter(colIdx + 1);
-                    const plantasTarget = grupo.isAgrupado ? DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS] : grupo.id;
+    const letraInicioActual = getColLetter(indicesAnioActual[0]);
+    const letraFinActual = getColLetter(indicesAnioActual[indicesAnioActual.length - 1]);
 
-                    const curVal = count(datasetAct, plantasTarget, esOB, per);
-                    const antVal = count(datasetAnt, plantasTarget, esOB, per);
-                    
-                    valTotalAct += curVal;
-                    valTotalAnt += antVal;
+    const headerRow = headersLabels.map((label, idx) => {
+      // El índice en headersLabels es idx. La columna de datos empieza en 1.
+      const isFrontera = (idx - 1 === idxUltimoAnioAnterior);
+      return { v: label, t: 's', s: isFrontera ? { ...STYLE_HEADER_MAIN, border: BORDER_2025_RIGHT } : STYLE_HEADER_MAIN };
+    });
 
-                    const style = getTrafficLightStyle(curVal, antVal, grupo.isAgrupado);
+    const matrix: any[][] = [];
+    const rowMap = new Map<string, number>();
+    matrix.push(headerRow);
+    let currentRowIndex = 2;
 
-                    if (grupo.isAgrupado) {
-                        const plantasHijas = DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS];
-                        const filasReferencias = plantasHijas.map(p => rowMap.get(`${p}_${suffix}`)).filter(r => r !== undefined);
-                        
-                        if (filasReferencias.length > 0) {
-                            const refs = filasReferencias.map(r => `${excelColLetter}${r}`).join(",");
-                            rowCells.push({ t: 'n', f: `SUM(${refs})`, v: curVal, s: style });
-                        } else {
-                            rowCells.push({ v: curVal, t: 'n', s: style });
-                        }
-                    } else {
-                        if (colIdx === 0) rowMap.set(`${grupo.id}_${suffix}`, currentRowIndex);
-                        rowCells.push({ v: curVal, t: 'n', s: style });
-                    }
-                });
+    const ordenGrupos = [
+      ...PLANTAS_INDIVIDUALES.map(p => ({ label: p, id: p, isAgrupado: false })),
+      { label: "COMPLEJO", id: "COMPLEJO", isAgrupado: true },
+      { label: "PF ALIMENTOS", id: "PF ALIMENTOS", isAgrupado: true }
+    ];
 
-                const styleTotalAct = getTrafficLightStyle(valTotalAct, valTotalAnt, true);
-                if (grupo.isAgrupado) {
-                    const plantasHijas = DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS];
-                    const filasRefs = plantasHijas.map(p => rowMap.get(`${p}_${suffix}`)).filter(r => r !== undefined);
-                    const refs = filasRefs.map(r => `${letraTotalAct}${r}`).join(",");
-                    rowCells.push({ t: 'n', f: `SUM(${refs})`, v: valTotalAct, s: styleTotalAct });
-                } else {
-                    const startCol = getColLetter(1); 
-                    const endCol = getColLetter(columnasPeriodos.length);
-                    rowCells.push({ t: 'n', f: `SUM(${startCol}${currentRowIndex}:${endCol}${currentRowIndex})`, v: valTotalAct, s: styleTotalAct });
-                }
+    const colIdxTotalAct = columnasPeriodos.length + 1;
+    const colIdxTotalAnt = colIdxTotalAct + 1;
+    const letraTotalAct = getColLetter(colIdxTotalAct);
+    const letraTotalAnt = getColLetter(colIdxTotalAnt);
 
-                rowCells.push({ v: valTotalAnt, t: 'n', s: { border: BORDER_ALL, alignment: { horizontal: "center" } } });
-                rowCells.push({ t: 'n', f: `${letraTotalAct}${currentRowIndex}-${letraTotalAnt}${currentRowIndex}`, v: valTotalAct - valTotalAnt, s: getTrafficLightStyle(valTotalAct, valTotalAnt, true) });
+    [false, true].forEach(esOB => {
+      const suffix = esOB ? "OB" : "OM";
+      const suffixDisplay = esOB ? "(OB)" : "(OM)";
 
-                matrix.push(rowCells);
-                currentRowIndex++;
+      ordenGrupos.forEach(grupo => {
+        const rowCells: any[] = [];
+        // Variables de suma para la fila actual
+        let valTotalActActual = 0;
+        let valTotalAntActual = 0;
 
-                CATEGORIAS.forEach(cat => {
-                    const filaCat: any[] = [{ v: `   ${cat}`, t: 's', s: { border: BORDER_ALL } }];
-                    const plantasTarget = grupo.isAgrupado ? DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS] : grupo.id;
+        rowCells.push({ v: `${grupo.label} ${suffixDisplay}`, t: 's', s: { font: { bold: true }, border: BORDER_ALL, fill: { fgColor: { rgb: "FFFFE0" } } } });
 
-                    columnasPeriodos.forEach(per => {
-                        const cVal = count(datasetAct, plantasTarget, esOB, per, cat);
-                        const aVal = count(datasetAnt, plantasTarget, esOB, per, cat);
-                        filaCat.push({ v: cVal, t: 'n', s: getTrafficLightStyle(cVal, aVal) });
-                    });
+        columnasPeriodos.forEach((per, colIdx) => {
+          const excelColLetter = getColLetter(colIdx + 1);
+          const plantasTarget = grupo.isAgrupado ? DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS] : grupo.id;
 
-                    const tActCat = countTotal(datasetAct, plantasTarget, esOB, cat);
-                    const tAntCat = countTotal(datasetAnt, plantasTarget, esOB, cat);
-                    
-                    filaCat.push({ v: tActCat, t: 'n', s: getTrafficLightStyle(tActCat, tAntCat, true) });
-                    filaCat.push({ v: tAntCat, t: 'n', s: { border: BORDER_ALL, alignment: { horizontal: "center" } } });
-                    filaCat.push({ t: 'n', f: `${letraTotalAct}${currentRowIndex}-${letraTotalAnt}${currentRowIndex}`, v: tActCat - tAntCat, s: getTrafficLightStyle(tActCat, tAntCat, true) });
+          const curVal = count(datasetAct, plantasTarget, esOB, per);
+          const antVal = count(datasetAnt, plantasTarget, esOB, per);
 
-                    matrix.push(filaCat);
-                    currentRowIndex++;
-                });
+          // Lógica de suma: Solo si el periodo es del año actual
+          if (per.includes(anioFull) || per.endsWith(`-${anioShort}`)) {
+            valTotalActActual += curVal;
+            valTotalAntActual += antVal;
+          }
 
-                matrix.push([]); 
-                currentRowIndex++;
-            });
+          const extraStyle = (colIdx === idxUltimoAnioAnterior) ? BORDER_2025_RIGHT : BORDER_ALL;
+          const style = getTrafficLightStyle(curVal, antVal, grupo.isAgrupado, extraStyle);
+
+          if (grupo.isAgrupado) {
+            const plantasHijas = DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS];
+            const filasReferencias = plantasHijas.map(p => rowMap.get(`${p}_${suffix}`)).filter(r => r !== undefined);
+            if (filasReferencias.length > 0) {
+              const refs = filasReferencias.map(r => `${excelColLetter}${r}`).join(",");
+              rowCells.push({ t: 'n', f: `SUM(${refs})`, v: curVal, s: style });
+            } else {
+              rowCells.push({ v: curVal, t: 'n', s: style });
+            }
+          } else {
+            if (colIdx === 0) rowMap.set(`${grupo.id}_${suffix}`, currentRowIndex);
+            rowCells.push({ v: curVal, t: 'n', s: style });
+          }
         });
 
-        const wsResumen = XLSX.utils.aoa_to_sheet(matrix);
-        wsResumen['!cols'] = [{ wch: 25 }, ...columnasPeriodos.map(() => ({ wch: 10 })), { wch: 12 }, { wch: 12 }, { wch: 10 }];
-        XLSX.utils.book_append_sheet(wb, wsResumen, "RESUMEN_EJECUTIVO");
+        // Celdas de Totales con valores calculados (v:) y fórmulas (f:)
+        const styleTotalAct = getTrafficLightStyle(valTotalActActual, valTotalAntActual, true);
 
-        const dataRaw = datasetAct.map(item => ({ Planta: item.planta, OT: item.ot, Descripcion: item.descripcion, Estado: item.estado, Clasificacion: item.clasificacion, Tipo: item.esOB ? "OB" : "OM", Periodo: item.periodo, Semana: item.semana, Tecnicos: item.detallesTecnicos?.map(t => t.tecnico).join(", ") || "" }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataRaw), "DATA_DETALLADA");
+        if (grupo.isAgrupado) {
+          const plantasHijas = DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS];
+          const filasRefs = plantasHijas.map(p => rowMap.get(`${p}_${suffix}`)).filter(r => r !== undefined);
+          const refs = filasRefs.map(r => `${letraTotalAct}${r}`).join(",");
+          rowCells.push({ t: 'n', f: `SUM(${refs})`, v: valTotalActActual, s: styleTotalAct });
+        } else {
+          rowCells.push({ t: 'n', f: `SUM(${letraInicioActual}${currentRowIndex}:${letraFinActual}${currentRowIndex})`, v: valTotalActActual, s: styleTotalAct });
+        }
 
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        
-        // --- LÓGICA DE NOMBRE DINÁMICO ---
-        // reporteActual suele venir como "2026-S05", queremos extraer el "S05" o "S5"
-        const semanaLabel = reporteActual.includes('-') ? reporteActual.split('-')[1] : reporteActual;
-        const nombreArchivo = `Dashboard_Atrasos_${semanaLabel}.xlsx`;
+        rowCells.push({ v: valTotalAntActual, t: 'n', s: { border: BORDER_ALL, alignment: { horizontal: "center" }, font: { bold: true } } });
+        rowCells.push({ t: 'n', f: `${letraTotalAct}${currentRowIndex}-${letraTotalAnt}${currentRowIndex}`, v: valTotalActActual - valTotalAntActual, s: getTrafficLightStyle(valTotalActActual, valTotalAntActual, true) });
 
-        const filePath = await save({ 
-            filters: [{ name: 'Excel', extensions: ['xlsx'] }], 
-            defaultPath: nombreArchivo 
+        matrix.push(rowCells);
+        currentRowIndex++;
+
+        CATEGORIAS.forEach(cat => {
+          const filaCat: any[] = [{ v: `   ${cat}`, t: 's', s: { border: BORDER_ALL } }];
+          const plantasTarget = grupo.isAgrupado ? DEFINICION_GRUPOS[grupo.id as keyof typeof DEFINICION_GRUPOS] : grupo.id;
+
+          let catTotalAct = 0;
+          let catTotalAnt = 0;
+
+          columnasPeriodos.forEach((per, cIdx) => {
+            const cVal = count(datasetAct, plantasTarget, esOB, per, cat);
+            const aVal = count(datasetAnt, plantasTarget, esOB, per, cat);
+
+            if (per.includes(anioFull) || per.endsWith(`-${anioShort}`)) {
+              catTotalAct += cVal;
+              catTotalAnt += aVal;
+            }
+
+            const extraStyle = (cIdx === idxUltimoAnioAnterior) ? BORDER_2025_RIGHT : BORDER_ALL;
+            filaCat.push({ v: cVal, t: 'n', s: getTrafficLightStyle(cVal, aVal, false, extraStyle) });
+          });
+
+          // Total Actual: Añadimos la fórmula SUM usando el rango dinámico del año actual
+          filaCat.push({
+            t: 'n',
+            f: `SUM(${letraInicioActual}${currentRowIndex}:${letraFinActual}${currentRowIndex})`,
+            v: catTotalAct,
+            s: getTrafficLightStyle(catTotalAct, catTotalAnt, true)
+          });
+
+          // Total Anterior S/A (Valor fijo)
+          filaCat.push({
+            v: catTotalAnt,
+            t: 'n',
+            s: { border: BORDER_ALL, alignment: { horizontal: "center" } }
+          });
+
+          // Delta (Fórmula de resta)
+          filaCat.push({
+            t: 'n',
+            f: `${letraTotalAct}${currentRowIndex}-${letraTotalAnt}${currentRowIndex}`,
+            v: catTotalAct - catTotalAnt,
+            s: getTrafficLightStyle(catTotalAct, catTotalAnt, true)
+          });
+
+          matrix.push(filaCat);
+          currentRowIndex++;
         });
-        
-        if (filePath) await writeFile(filePath, new Uint8Array(excelBuffer));
 
-    } catch (e) { console.error(e); }
+        matrix.push([]);
+        currentRowIndex++;
+      });
+    });
+
+    const wsResumen = XLSX.utils.aoa_to_sheet(matrix);
+    wsResumen['!cols'] = [{ wch: 25 }, ...columnasPeriodos.map(() => ({ wch: 10 })), { wch: 12 }, { wch: 15 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsResumen, "RESUMEN_EJECUTIVO");
+
+    const dataRaw = datasetAct.map(item => ({ Planta: item.planta, OT: item.ot, Descripcion: item.descripcion, Estado: item.estado, Clasificacion: item.clasificacion, Tipo: item.esOB ? "OB" : "OM", Periodo: item.periodo, Semana: item.semana, Tecnicos: item.detallesTecnicos?.map(t => t.tecnico).join(", ") || "" }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataRaw), "DATA_DETALLADA");
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+    // LÓGICA DE NOMBRE DINÁMICO
+    // reporteActual suele venir como "2026-S05", queremos extraer el "S05" o "S5"
+    const semanaLabel = reporteActual.includes('-') ? reporteActual.split('-')[1] : reporteActual;
+    const nombreArchivo = `Dashboard_Atrasos_${semanaLabel}.xlsx`;
+
+    const filePath = await save({
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+      defaultPath: nombreArchivo
+    });
+
+    if (filePath) await writeFile(filePath, new Uint8Array(excelBuffer));
+
+  } catch (e) { console.error(e); }
 };

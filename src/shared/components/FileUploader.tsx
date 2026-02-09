@@ -8,9 +8,9 @@ export type FileType = 'PLAN' | 'SEGUIMIENTO' | 'FALLAS';
 interface FileUploaderProps {
   onFileUpload: (e: any, tipo: FileType) => void;
   isLoading: boolean;
-  status: { 
-    plan: boolean; 
-    seguimiento: boolean; 
+  status: {
+    plan: boolean;
+    seguimiento: boolean;
     fallas: boolean;
   };
   highlightedModule: FileType | null;
@@ -21,9 +21,8 @@ interface FileUploaderProps {
 
 
 export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModule, targetWeek, weekOptions, setTargetWeek }: FileUploaderProps) => {
-  
-  // Nuevo estado para el Modal de Confirmación
-  const [pendingFile, setPendingFile] = useState<{event: any, tipo: FileType} | null>(null);
+
+  const [pendingFile, setPendingFile] = useState<{ event: any, tipo: FileType } | null>(null);
 
   const cardsConfig = [
     { type: 'PLAN' as FileType, label: 'Maestro Plan', sublabel: 'Arrastra "B.ACT.xlsx" aquí', icon: FileSpreadsheet, color: 'text-pf-red', bg: 'bg-pf-red', active: status.plan },
@@ -52,7 +51,7 @@ export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModul
   return (
     <div className="relative scroll-mt-10" id="uploader-section">
       <div className="flex justify-between items-end mb-6">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Zona de Carga</h3>
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Zona de Carga</h3>
       </div>
 
       {/* MODAL DE CONFIRMACIÓN DE SEMANA */}
@@ -71,7 +70,7 @@ export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModul
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Selecciona la semana del reporte:</label>
-              <select 
+              <select
                 value={targetWeek}
                 onChange={(e) => setTargetWeek(e.target.value)}
                 className="w-full text-base font-black text-slate-700 bg-white border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 ring-blue-500/20"
@@ -83,13 +82,13 @@ export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModul
             </div>
 
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => setPendingFile(null)}
                 className="flex-1 px-6 py-3 rounded-xl font-black text-xs text-slate-400 hover:bg-slate-100 transition-all uppercase"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 onClick={confirmUpload}
                 className="flex-[2] bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 uppercase"
               >
@@ -121,7 +120,7 @@ export const FileUploader = ({ onFileUpload, isLoading, status, highlightedModul
             bgClass={card.bg}
             isUploaded={card.active}
             isLoading={isLoading}
-            isHighlighted={highlightedModule === card.type} 
+            isHighlighted={highlightedModule === card.type}
             onUpload={handleInternalUpload}
           />
         ))}

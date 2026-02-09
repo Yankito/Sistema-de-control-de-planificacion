@@ -9,11 +9,11 @@ interface SidebarItemProps {
   isCollapsed: boolean;
   locked?: boolean;
   onClick: () => void;
-  className?: string; // Para estilos extra (ej: indentación en hijos)
+  className?: string;
 }
 
-export const SidebarItem = ({ 
-  label, icon: Icon, isActive, isCollapsed, locked, onClick, className = "" 
+export const SidebarItem = ({
+  label, icon: Icon, isActive, isCollapsed, locked, onClick, className = ""
 }: SidebarItemProps) => {
   return (
     <button
@@ -30,7 +30,7 @@ export const SidebarItem = ({
     >
       <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-4'}`}>
         <Icon size={20} className={`min-w-[20px] ${isActive && !locked ? 'text-pf-red' : ''}`} />
-        
+
         <span className={`
           font-black whitespace-nowrap overflow-hidden transition-all duration-300 uppercase tracking-tight
           ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100 ml-4'}

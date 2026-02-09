@@ -15,14 +15,14 @@ export const OTCard = ({ item, isNew, onSelectEmployee, selectedEmployee }: OTCa
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-black text-slate-900">{item.ot}</span>
-          
+
           {esNueva && (
             <span className="bg-red-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse shadow-sm">
               NUEVA
             </span>
           )}
         </div>
-        
+
         {item.fecha && (
           <div className="flex items-center gap-1 text-slate-400">
             <Calendar size={10} />
@@ -32,22 +32,21 @@ export const OTCard = ({ item, isNew, onSelectEmployee, selectedEmployee }: OTCa
       </div>
 
       <div className="mb-3">
-        <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold ${
-          item.clasificacion === 'CUMPLIDA' ? 'bg-green-100 text-green-700 border border-green-200' : 
-          item.clasificacion === 'PROGRAMADOR' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 
-          item.clasificacion === 'TECNICO / SERVICIO' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 
-          'bg-amber-100 text-amber-700 border border-amber-200'
-        }`}>
+        <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold ${item.clasificacion === 'CUMPLIDA' ? 'bg-green-100 text-green-700 border border-green-200' :
+            item.clasificacion === 'PROGRAMADOR' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+              item.clasificacion === 'TECNICO / SERVICIO' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                'bg-amber-100 text-amber-700 border border-amber-200'
+          }`}>
           {item.clasificacion}
         </span>
       </div>
-      
+
       <p className="text-[10px] text-slate-500 uppercase font-medium line-clamp-2 mb-3">{item.descripcion}</p>
-      
+
       <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 mb-3 space-y-1">
         {item.detallesTecnicos?.map((t: any, i: number) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             onClick={() => onSelectEmployee && onSelectEmployee(t.tecnico)}
             className={`flex items-center justify-between p-1 rounded transition-colors ${!selectedEmployee ? 'hover:bg-red-50 cursor-pointer group' : ''}`}
           >

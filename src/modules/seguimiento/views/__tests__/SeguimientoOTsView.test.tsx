@@ -5,9 +5,7 @@ import { SeguimientoOTsView } from '../SeguimientoOTsView';
 import { DatabaseService } from '../../../../shared/db/DatabaseService';
 import { confirm } from '@tauri-apps/plugin-dialog';
 
-// =============================================================================
-// 1. CORRECCIÓN DE RUTAS EN MOCKS (CRÍTICO)
-// =============================================================================
+// CORRECCIÓN DE RUTAS EN MOCKS (CRÍTICO)
 
 vi.mock('../../components/ResumenTable', () => ({
   ResumenTable: ({ titulo }: any) => <div data-testid="resumen-table">{titulo}</div>
@@ -58,9 +56,7 @@ vi.mock('../../logic/backlogAnalysis', () => ({
   analyzeBacklogFlow: () => ({ nuevas: 10, finalizadas: 5, conAvance: 2 })
 }));
 
-// =============================================================================
-// 2. DATA DUMMY Y SETUP
-// =============================================================================
+// DATA DUMMY Y SETUP
 
 const mockData = [
   { ot: '100', planta: 'PF1', periodo: '2026', semana: '2026-S05', clasificacion: 'TECNICO', esOB: false, descripcion: 'T1' },

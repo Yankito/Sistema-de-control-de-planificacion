@@ -15,7 +15,7 @@ export const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: Evo
 
   return (
     <div className={`border rounded-xl bg-white overflow-hidden shadow-sm ${isOpen ? 'ring-2 ring-offset-1' : ''} ring-${color}-200 transition-all`}>
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
         className="p-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center"
       >
@@ -30,7 +30,7 @@ export const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: Evo
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-2xl font-black text-${color}-600`}>{data.length}</span>
-          {isOpen ? <ChevronUp size={16} className="text-slate-400"/> : <ChevronDown size={16} className="text-slate-400"/>}
+          {isOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
         </div>
       </div>
 
@@ -51,10 +51,10 @@ export const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: Evo
                   <td className="px-2 py-2 font-mono text-slate-500 w-20">{row.ot}</td>
                   <td className="px-2 py-2 text-slate-700">
                     <div className="flex flex-col">
-                        <span className="truncate max-w-[200px] font-medium">{row.descripcion}</span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                            {row.estadoAnterior || 'N/A'} <ArrowRight size={8}/> {row.estadoActual || 'Fin'}
-                        </span>
+                      <span className="truncate max-w-[200px] font-medium">{row.descripcion}</span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        {row.estadoAnterior || 'N/A'} <ArrowRight size={8} /> {row.estadoActual || 'Fin'}
+                      </span>
                     </div>
                   </td>
                 </tr>

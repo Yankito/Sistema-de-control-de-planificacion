@@ -44,8 +44,8 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
         const htmlEl = el as HTMLElement;
         if (htmlEl.classList.toString().includes('h-[')) htmlEl.style.height = 'auto';
         if (htmlEl.style.overflowY === 'auto' || htmlEl.classList.contains('custom-scrollbar')) {
-            htmlEl.style.overflow = 'visible';
-            htmlEl.style.height = 'auto';
+          htmlEl.style.overflow = 'visible';
+          htmlEl.style.height = 'auto';
         }
       });
 
@@ -55,10 +55,10 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
         .h-\\[500px\\] { height: auto !important; min-height: 500px !important; }
       `;
       clone.appendChild(styleReset);
-      
+
       const headerReport = document.createElement('div');
       headerReport.style.cssText = `background: white; padding: 40px; margin-bottom: 20px; border-bottom: 4px solid #ef4444; display: flex; justify-content: space-between; align-items: center; font-family: sans-serif;`;
-      
+
       // Formateamos el texto de la semana para que se vea mejor
       const semanaDisplay = semana === "TODAS" ? "ANUAL" : `SEMANA ${semana}`;
 
@@ -89,7 +89,7 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
       await new Promise((resolve) => setTimeout(resolve, 1000));
       const finalHeight = clone.scrollHeight;
 
-      // --- 2. CAPTURAR COMO DATA URL ---
+      // CAPTURAR COMO DATA URL 
       const dataUrl = await toPng(clone, {
         quality: 1.0,
         pixelRatio: 2,
@@ -100,7 +100,7 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
 
       document.body.removeChild(clone);
 
-      // --- 3. DIÁLOGO TAURI PARA ELEGIR CARPETA Y NOMBRE ---
+      // DIÁLOGO TAURI PARA ELEGIR CARPETA Y NOMBRE 
       const selectedPath = await save({
         filters: [{
           name: 'Imagen',
@@ -121,9 +121,6 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
 
         // Guardar el archivo en la ruta seleccionada
         await writeFile(selectedPath, uint8Array);
-        
-        // Opcional: Feedback de éxito
-        console.log("Archivo guardado en:", selectedPath);
       }
 
     } catch (err) {
@@ -135,7 +132,7 @@ export const ExportButton = ({ elementId, fileName, plantaSeleccionada, rangoTex
   };
 
   return (
-    <button 
+    <button
       onClick={handleExport}
       disabled={isExporting}
       className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 border border-slate-800 ${isExporting ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-black hover:shadow-pf-red/20'}`}

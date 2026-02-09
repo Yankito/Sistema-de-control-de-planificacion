@@ -1,16 +1,11 @@
 // src/utils/dateUtils.ts
 
-// ==========================================
-// 1. UTILIDADES DE FORMATO (EXISTENTES)
-// ==========================================
+// UTILIDADES DE FORMATO
 export const clp = (v: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
 export const num = (v: number) => new Intl.NumberFormat('es-CL').format(v);
 export const fechaFmt = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
 
-// ==========================================
-// 2. NUEVA LÓGICA DE SEMANAS (SISTEMA ISO)
-// ==========================================
-
+// LÓGICA DE SEMANAS
 export const getWeekID = (date: Date): string => {
   const d = new Date(date.valueOf());
   const dayNr = (d.getDay() + 6) % 7;
@@ -18,21 +13,20 @@ export const getWeekID = (date: Date): string => {
   const firstThursday = d.valueOf();
   d.setMonth(0, 1);
   if (d.getDay() !== 4) {
-      d.setMonth(0, 1 + ((4 - d.getDay()) + 7) % 7);
+    d.setMonth(0, 1 + ((4 - d.getDay()) + 7) % 7);
   }
   const weekNumber = 1 + Math.ceil((firstThursday - d.valueOf()) / 604800000);
-  const targetYear = d.getFullYear(); 
-  
+  const targetYear = d.getFullYear();
+
   return `${targetYear}-S${weekNumber.toString().padStart(2, '0')}`;
 };
 
-/**
- * Devuelve la descripción visual: "(26 Ene - 01 Feb)"
- */
+
+// Devuelve la descripción visual: "(26 Ene - 01 Feb)"
 export const getWeekRange = (date: Date): string => {
   const lunes = new Date(date.valueOf());
-  const diaSemana = (lunes.getDay() + 6) % 7; 
-  lunes.setDate(lunes.getDate() - diaSemana); 
+  const diaSemana = (lunes.getDay() + 6) % 7;
+  lunes.setDate(lunes.getDate() - diaSemana);
 
   const domingo = new Date(lunes.valueOf());
   domingo.setDate(lunes.getDate() + 6);
@@ -44,36 +38,33 @@ export const getWeekRange = (date: Date): string => {
 };
 
 export const getWeekOptions = () => {
-    const options: Array<{ label: string; value: string }> = [];
-    const today = new Date();
-    
-    // Semana Anterior
-    const addOpt = (d: Date, prefix: string = "") => {
-        const id = getWeekID(d);        // Valor: "2026-S05"
-        const range = getWeekRange(d);  // Visual: "(...)"
-        const label = prefix ? `${prefix}: ${id} ${range}` : `${id} ${range}`;
-        options.push({ label, value: id });
-    };
+  const options: Array<{ label: string; value: string }> = [];
+  const today = new Date();
 
-    // Generar opciones
-    const lastWeek = new Date(today); lastWeek.setDate(today.getDate() - 7);
-    addOpt(lastWeek, "Anterior");
+  // Semana Anterior
+  const addOpt = (d: Date, prefix: string = "") => {
+    const id = getWeekID(d);        // Valor: "2026-S05"
+    const range = getWeekRange(d);  // Visual: "(...)"
+    const label = prefix ? `${prefix}: ${id} ${range}` : `${id} ${range}`;
+    options.push({ label, value: id });
+  };
 
-    addOpt(today, "Actual");
+  // Generar opciones
+  const lastWeek = new Date(today); lastWeek.setDate(today.getDate() - 7);
+  addOpt(lastWeek, "Anterior");
 
-    const twoWeeksAgo = new Date(today); twoWeeksAgo.setDate(today.getDate() - 14);
-    addOpt(twoWeeksAgo);
+  addOpt(today, "Actual");
 
-    const threeWeeksAgo = new Date(today); threeWeeksAgo.setDate(today.getDate() - 21);
-    addOpt(threeWeeksAgo);
+  const twoWeeksAgo = new Date(today); twoWeeksAgo.setDate(today.getDate() - 14);
+  addOpt(twoWeeksAgo);
 
-    return { options, default: getWeekID(lastWeek) };
+  const threeWeeksAgo = new Date(today); threeWeeksAgo.setDate(today.getDate() - 21);
+  addOpt(threeWeeksAgo);
+
+  return { options, default: getWeekID(lastWeek) };
 };
-// ==========================================
-// 3. COMPATIBILIDAD (LEGACY)
-// ==========================================
-// Mantenemos tu función original por si se usa en otra parte del sistema,
-// aunque para los reportes nuevos recomendamos usar getWeekLabel.
+
+// COMPATIBILIDAD
 export const getRangoSemana = (semana: number, anio: number) => {
   const primerDiaAnio = new Date(anio, 0, 1);
   const diaSemana = primerDiaAnio.getDay();
@@ -89,26 +80,26 @@ export const getRangoSemana = (semana: number, anio: number) => {
   finSemanaTarget.setDate(inicioSemanaTarget.getDate() + 6);
 
   const fmt = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
-  
+
   return `${fmt(inicioSemanaTarget)} - ${fmt(finSemanaTarget)}`;
 };
 
 export const getRangeFromWeekID = (weekID: string): string => {
-    if (!weekID || weekID === "TODAS") return "";
-    
-    const [yearStr, weekStr] = weekID.split("-S");
-    const year = parseInt(yearStr);
-    const week = parseInt(weekStr);
+  if (!weekID || weekID === "TODAS") return "";
 
-    // Encontrar el primer jueves del año (estándar ISO)
-    const firstThursday = new Date(year, 0, 1);
-    while (firstThursday.getDay() !== 4) {
-        firstThursday.setDate(firstThursday.getDate() + 1);
-    }
+  const [yearStr, weekStr] = weekID.split("-S");
+  const year = parseInt(yearStr);
+  const week = parseInt(weekStr);
 
-    // Calcular el lunes de la semana buscada
-    const targetMonday = new Date(firstThursday.valueOf());
-    targetMonday.setDate(targetMonday.getDate() - 3 + (week - 1) * 7);
+  // Encontrar el primer jueves del año (estándar ISO)
+  const firstThursday = new Date(year, 0, 1);
+  while (firstThursday.getDay() !== 4) {
+    firstThursday.setDate(firstThursday.getDate() + 1);
+  }
 
-    return getWeekRange(targetMonday);
+  // Calcular el lunes de la semana buscada
+  const targetMonday = new Date(firstThursday.valueOf());
+  targetMonday.setDate(targetMonday.getDate() - 3 + (week - 1) * 7);
+
+  return getWeekRange(targetMonday);
 };

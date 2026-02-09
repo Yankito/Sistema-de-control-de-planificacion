@@ -2,9 +2,9 @@
 export const DataTable = ({ data, isPlan }: { data: any[], isPlan: boolean }) => {
   if (!data || data.length === 0) return <div className="p-20 text-center text-slate-400">Sin datos.</div>;
 
-  const headers = isPlan 
+  const headers = isPlan
     ? ["Nro Orden", "Equipo", "Descripción Mant", "Fecha Sugerida", "Mecánico (Rol)"]
-    : ["Pedido de Trabajo", "Número de Activo", "Descripción", "Departamento de Propiedad", "Estado"]; 
+    : ["Pedido de Trabajo", "Número de Activo", "Descripción", "Departamento de Propiedad", "Estado"];
 
   const keyMap: Record<string, string> = {
     "Pedido de Trabajo": "PEDIDO DE TRABAJO",

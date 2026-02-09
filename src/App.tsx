@@ -26,62 +26,61 @@ import { useSeguimientoData } from "./modules/seguimiento/hooks/useSeguimientoDa
 import { FallaRow } from "./modules/fallas/types";
 
 function App() {
-  // --- 1. ESTADO GLOBAL UI ---
   const [activeTab, setActiveTab] = useState("dash");
   const [historialSemanas, setHistorialSemanas] = useState<string[]>([]);
   const weekConfig = useMemo(() => getWeekOptions(), []);
   const [targetUploadWeek, setTargetUploadWeek] = useState(weekConfig.default);
   const [highlightedModule, setHighlightedModule] = useState<FileType | null>(null);
-  
-  // --- 2. DOMINIO PLANIFICACIÓN ---
+
   const planning = usePlanificacionManager();
-  
-  // --- 3. DOMINIO FALLAS ---
+
   const [fallasResult, setFallasResult] = useState<FallaRow[]>([]);
 
-  // --- 4. DOMINIO SEGUIMIENTO ---
   const seguimiento = useSeguimientoData(historialSemanas);
 
-  // --- 5. GESTIÓN DE ARCHIVOS ---
+  // GESTIÓN DE ARCHIVOS 
   const fileProcessor = useFileProcessor({
-      targetWeek: targetUploadWeek,
-      setActiveTab,
-      onPlanLoaded: planning.cargarDatosDesdeExcel,
-      onFallasLoaded: setFallasResult,
-      onSeguimientoLoaded: async () => {
+    targetWeek: targetUploadWeek,
+    setActiveTab,
+    onPlanLoaded: planning.cargarDatosDesdeExcel,
+    onFallasLoaded: setFallasResult,
+    onSeguimientoLoaded: () => {
+      const initData = async () => {
+        try {
           const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
           setHistorialSemanas(semanas);
           await seguimiento.cargarReporte(targetUploadWeek);
-          // Al cargar uno nuevo, intentamos buscar el anterior para la comparación del Dashboard
-          if (semanas.length > 1) {
-            await seguimiento.cambiarComparacion(semanas[1]);
-          }
-      }
+        } catch (error) {
+          console.error("Error cargando seguimiento:", error);
+        }
+      };
+      initData();
+    }
   });
 
-  // --- 6. EFECTOS INICIALES (OPTIMIZADO) ---
+  // EFECTOS INICIALES
   useEffect(() => {
     const initApp = async () => {
-        await DatabaseService.init();
-        const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
-        setHistorialSemanas(semanas);
-        
-        if (semanas.length > 0) {
-             const ultimaSemana = semanas[0];
-             await seguimiento.cargarReporte(ultimaSemana);
-             
-             // NUEVO: Si hay una semana anterior, la cargamos automáticamente para el Dashboard
-             if (semanas.length > 1) {
-               await seguimiento.cambiarComparacion(semanas[1]);
-             }
-             
-             setActiveTab("seguimiento");
+      await DatabaseService.init();
+      const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
+      setHistorialSemanas(semanas);
+
+      if (semanas.length > 0) {
+        const ultimaSemana = semanas[0];
+        await seguimiento.cargarReporte(ultimaSemana);
+
+        // Si hay una semana anterior, la cargamos automáticamente para el Dashboard
+        if (semanas.length > 1) {
+          await seguimiento.cambiarComparacion(semanas[1]);
         }
+
+        setActiveTab("seguimiento");
+      }
     };
     initApp();
   }, []);
 
-  // --- 7. UTILS DE UI ---
+  //  UTILS DE UI 
   const handleRequestUpload = (tipo: FileType) => {
     setHighlightedModule(tipo);
     document.getElementById("uploader-section")?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -89,24 +88,24 @@ function App() {
   };
 
   const handleLimpiarTodo = () => {
-      planning.reset();
-      setFallasResult([]);
-      seguimiento.resetTodo();
-      setActiveTab("dash");
+    planning.reset();
+    setFallasResult([]);
+    seguimiento.resetTodo();
+    setActiveTab("dash");
   };
 
   // Helper para validación de noche
   const isNocheValid = (tecnicos: any[], fechaStr: string) => {
     if (!planning.mapaHorariosActual || !tecnicos || tecnicos.length === 0) return false;
     return tecnicos.every((tec: any) => {
-       if (["OT NUEVA", "SIN HISTORIAL", "VACANTE"].includes(tec.nombre)) return true;
-       const datosEmp = planning.empleadosMap.get(tec.nombre);
-       const rolEmp = datosEmp ? datosEmp.rol : "M";
-       if (!necesitaValidacionTurno(rolEmp)) return true;
-       const turnos = planning.mapaHorariosActual.get(tec.nombre);
-       if (!turnos) return false; 
-       const dia = parseInt(fechaStr.split('/')[0]);
-       return turnos[dia - 1]?.trim().toUpperCase() === 'N';
+      if (["OT NUEVA", "SIN HISTORIAL", "VACANTE"].includes(tec.nombre)) return true;
+      const datosEmp = planning.empleadosMap.get(tec.nombre);
+      const rolEmp = datosEmp ? datosEmp.rol : "M";
+      if (!necesitaValidacionTurno(rolEmp)) return true;
+      const turnos = planning.mapaHorariosActual.get(tec.nombre);
+      if (!turnos) return false;
+      const dia = parseInt(fechaStr.split('/')[0]);
+      return turnos[dia - 1]?.trim().toUpperCase() === 'N';
     });
   };
 
@@ -115,32 +114,30 @@ function App() {
 
   return (
     <div className="flex h-screen bg-pf-light text-slate-800 font-sans">
-      <Sidebar 
-        archivoCargado={!!planning.workbookActual} 
-        // Usamos historialSemanas para saber si hay datos disponibles en general, 
-        // no dataActual que puede estar cargando
-        tieneSeguimiento={historialSemanas.length > 0} 
+      <Sidebar
+        archivoCargado={!!planning.workbookActual}
+        tieneSeguimiento={historialSemanas.length > 0}
         tieneFallas={fallasResult.length > 0}
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLimpiar={handleLimpiarTodo} 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLimpiar={handleLimpiarTodo}
       />
-      
+
       <main className="flex-1 flex flex-col overflow-hidden">
         <section className="flex-1 p-10 overflow-y-auto">
-          
+
           {/* VISTA: DASHBOARD & UPLOAD */}
           {activeTab === "dash" && (
             <div className="space-y-10">
               <div className="bg-white p-8 rounded-3xl border border-pf-border shadow-sm">
                 <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter">Gestión de Datos</h2>
-                <FileUploader 
-                  onFileUpload={fileProcessor.handleFileUpload} 
+                <FileUploader
+                  onFileUpload={fileProcessor.handleFileUpload}
                   isLoading={planning.cargandoPlan || fileProcessor.loading.seguimiento || fileProcessor.loading.fallas}
-                  status={{ 
-                      plan: !!planning.workbookActual, 
-                      seguimiento: historialSemanas.length > 0, 
-                      fallas: fallasResult.length > 0 
+                  status={{
+                    plan: !!planning.workbookActual,
+                    seguimiento: historialSemanas.length > 0,
+                    fallas: fallasResult.length > 0
                   }}
                   highlightedModule={highlightedModule}
                   targetWeek={targetUploadWeek}
@@ -148,19 +145,18 @@ function App() {
                   weekOptions={weekConfig.options}
                 />
               </div>
-              <DashboardView 
-                planResult={planning.planResult} 
+              <DashboardView
+                planResult={planning.planResult}
                 onEjecutarPlan={(modo) => {
-                    planning.ejecutarPlanificacion(modo);
-                    setActiveTab("plan");
+                  planning.ejecutarPlanificacion(modo);
+                  setActiveTab("plan");
                 }}
                 seguimientoResult={seguimiento.dataActual}
                 seguimientoPrevio={seguimiento.dataAnterior}
-                
-                // PASAMOS EL CONTEXTO DE SEMANAS
+
                 reporteActual={seguimiento.reporteActual}
                 semanaComparar={seguimiento.semanaComparar}
-                
+
                 fallasResult={fallasResult}
                 setActiveTab={setActiveTab}
                 archivoCargado={!!planning.workbookActual}
@@ -173,64 +169,62 @@ function App() {
           {planning.workbookActual && (
             <>
               {activeTab === "plan" && (
-                <PlanificacionView 
+                <PlanificacionView
                   planResult={planning.planFiltrado}
                   planResultSinAsignar={planning.sinAsignarFiltrado}
-                  setPlanResult={planning.setPlanResult} 
-                  plantas={plantas} 
-                  plantaSeleccionada={planning.plantaPlan} 
+                  setPlanResult={planning.setPlanResult}
+                  plantas={plantas}
+                  plantaSeleccionada={planning.plantaPlan}
                   onCambiarPlanta={planning.setPlantaPlan}
                   empleadosMap={planning.empleadosMap}
                   mapaHorarios={planning.mapaHorariosActual}
-                  onEditTecnicos={(orden: any) => { 
-                      planning.setOrdenEditando(orden); 
-                      planning.setModalTecnicoOpen(true); 
+                  onEditTecnicos={(orden: any) => {
+                    planning.setOrdenEditando(orden);
+                    planning.setModalTecnicoOpen(true);
                   }}
                   fechaSeleccionada={planning.fechaFoco}
                   isNocheValid={isNocheValid}
                 />
               )}
               {activeTab === "gantt" && (
-                <HorariosView 
-                  horariosResult={planning.horariosResult} 
+                <HorariosView
+                  horariosResult={planning.horariosResult}
                   plantas={plantas}
-                  plantaSeleccionada={planning.plantaHorarios} 
-                  onCambiarPlanta={planning.cambiarPlantaHorarios} 
+                  plantaSeleccionada={planning.plantaHorarios}
+                  onCambiarPlanta={planning.cambiarPlantaHorarios}
                   onCambioTurno={planning.handleCambioTurno}
                 />
               )}
               {activeTab === "carga" && (
-                  <SeguimientoTecnicosView 
-                    planResult={planning.planResult} 
-                    plantas={plantas} 
-                    onNavegar={(p, f) => {
-                        setActiveTab("plan");
-                        planning.setPlantaPlan(p);
-                        planning.setFechaFoco(f);
-                    }} 
-                  />
+                <SeguimientoTecnicosView
+                  planResult={planning.planResult}
+                  plantas={plantas}
+                  onNavegar={(p, f) => {
+                    setActiveTab("plan");
+                    planning.setPlantaPlan(p);
+                    planning.setFechaFoco(f);
+                  }}
+                />
               )}
             </>
           )}
 
           {/* VISTA: SEGUIMIENTO */}
-          {/* CORRECCIÓN PRINCIPAL: Eliminamos la condición && seguimiento.dataActual.length > 0 */}
-          {/* Permitimos que se renderice si la tab está activa, la vista manejará el loading */}
           {activeTab === "seguimiento" && (
-             <SeguimientoOTsView 
-                seguimientoData={seguimiento} 
-                historialCompleto={historialSemanas}
-                onReporteEliminado={async () => {
-                    const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
-                    setHistorialSemanas(semanas);
-                    if(semanas.length === 0) setActiveTab("dash");
-                }}
-             />
+            <SeguimientoOTsView
+              seguimientoData={seguimiento}
+              historialCompleto={historialSemanas}
+              onReporteEliminado={async () => {
+                const semanas = await DatabaseService.getSemanasDisponibles('SEGUIMIENTO');
+                setHistorialSemanas(semanas);
+                if (semanas.length === 0) setActiveTab("dash");
+              }}
+            />
           )}
 
           {/* VISTA: FALLAS */}
           {activeTab === "fallas" && fallasResult.length > 0 && (
-              <FallasView data={fallasResult} />
+            <FallasView data={fallasResult} />
           )}
 
         </section>
@@ -241,8 +235,8 @@ function App() {
         onClose={() => planning.setModalTecnicoOpen(false)}
         orden={planning.ordenEditando}
         fecha={planning.ordenEditando?.fechaSugerida || ""}
-        empleados={Array.from(planning.empleadosMap.values()).map((v: any, i) => ({ ...v, key: Array.from(planning.empleadosMap.keys())[i] }))} 
-        mapaHorarios={planning.mapaHorariosActual} 
+        empleados={Array.from(planning.empleadosMap.values()).map((v: any, i) => ({ ...v, key: Array.from(planning.empleadosMap.keys())[i] }))}
+        mapaHorarios={planning.mapaHorariosActual}
         onAsignar={planning.handleAsignarTecnico}
         onModificarCupos={planning.handleModificarCupos}
       />
