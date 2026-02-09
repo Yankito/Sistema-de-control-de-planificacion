@@ -82,10 +82,13 @@ export const UploadCard = ({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={handleClick}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClick()}
       className={`
         relative overflow-hidden rounded-2xl p-4 border-2 transition-all duration-500 cursor-pointer group h-full flex flex-col justify-between
         ${isLoading ? 'opacity-50 cursor-wait' : ''}

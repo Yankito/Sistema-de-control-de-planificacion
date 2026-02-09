@@ -16,8 +16,17 @@ export const EvolutionGroup = ({ title, data, color, icon: Icon, sublabel }: Evo
   return (
     <div className={`border rounded-xl bg-white overflow-hidden shadow-sm ${isOpen ? 'ring-2 ring-offset-1' : ''} ring-${color}-200 transition-all`}>
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+        aria-expanded={isOpen}
+        className="p-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center focus:outline-none focus:bg-slate-100 focus:ring-inset focus:ring-2 focus:ring-blue-400"
       >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg bg-${color}-100 text-${color}-600`}>

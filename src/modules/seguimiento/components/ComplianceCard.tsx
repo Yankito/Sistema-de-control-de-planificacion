@@ -35,7 +35,18 @@ export const ComplianceCard = ({ planta, esOB, dataSemanaActual, onClick }: Comp
   if (total === 0) return null;
 
   return (
-    <div onClick={onClick} className={`p-5 rounded-2xl border-2 shadow-sm hover:shadow-md transition-all cursor-pointer group ${bgCard}`}>
+    <div 
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={`p-5 rounded-2xl border-2 shadow-sm hover:shadow-md transition-all cursor-pointer group ${bgCard} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+    >
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${porcentaje >= 80 ? 'bg-green-100' : 'bg-slate-100'} group-hover:scale-110 transition-transform`}>

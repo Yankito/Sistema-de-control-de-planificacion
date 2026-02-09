@@ -86,7 +86,19 @@ export const DashboardListView = ({
         ) : (
           paginatedList.map((item: any) => (
             activeTab === "FLOW" ? (
-              <div key={item.ot} onClick={() => onSelectOT(item)} className="bg-white p-3 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex justify-between items-start group">
+              <div 
+                key={item.ot} 
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectOT(item)} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectOT(item);
+                  }
+                }}
+                className="bg-white p-3 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex justify-between items-start group focus:outline-none focus:ring-2 focus:ring-blue-400 focus:z-10"
+              >
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-2 mb-1"><span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">{item.planta}</span><span className="font-mono text-xs font-bold text-slate-700 group-hover:text-blue-600">{item.ot}</span></div>
                   <p className="text-xs text-slate-500 truncate">{item.descripcion}</p>
@@ -95,7 +107,19 @@ export const DashboardListView = ({
                 {item.tipoMovimiento === 'FINALIZADA' && <div className="text-[9px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">{item.estadoActual}</div>}
               </div>
             ) : (
-              <div key={item.nombre} onClick={() => onSelectTech(item, filterPlanta)} className="bg-white p-3 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group">
+              <div 
+                key={item.nombre} 
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectTech(item, filterPlanta)} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectTech(item, filterPlanta);
+                  }
+                }}
+                className="bg-white p-3 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group focus:outline-none focus:ring-2 focus:ring-purple-400 focus:z-10"
+              >
                 <div className="flex items-center gap-3 flex-1">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${item.efectividad === 100 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'} group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors`}>{item.nombre.substring(0, 2)}</div>
                   <div className="flex-1 min-w-0">

@@ -36,7 +36,19 @@ const OTDetailView = ({ otItem, allData, onBack, onTechClick }: { otItem: OTFlow
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         <h3 className="text-xs font-black text-slate-400 uppercase mb-2 px-1">Técnicos Asignados</h3>
         {tecnicos.length === 0 ? <div className="text-center py-8 text-slate-300 italic text-xs">Sin asignación</div> : tecnicos.map((t, i) => (
-          <div key={i} onClick={() => onTechClick(t.tecnico)} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:shadow-md cursor-pointer transition-all bg-white group">
+          <div 
+            key={i} 
+            role="button"
+            tabIndex={0}
+            onClick={() => onTechClick(t.tecnico)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault(); 
+                onTechClick(t.tecnico);
+              }
+            }}
+            className="flex justify-between items-center p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:shadow-md cursor-pointer transition-all bg-white group focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 group-hover:bg-purple-100 group-hover:text-purple-600">{t.tecnico.substring(0, 2)}</div>
               <span className="text-sm font-bold text-slate-700 group-hover:text-purple-700">{t.tecnico}</span>
@@ -162,7 +174,12 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
 
   return (
     <div className={`fixed inset-0 z-50 flex justify-end transition-opacity duration-300 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-      <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
+      <div role="button"
+        tabIndex={-1}
+        aria-label="Cerrar modal"
+        className={`absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()} 
+      />
 
       {/* PANEL LATERAL */}
       <div className={`relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-out border-l border-slate-100 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>

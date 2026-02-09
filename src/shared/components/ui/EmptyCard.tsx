@@ -12,12 +12,22 @@ interface EmptyCardProps {
 
 export const EmptyCard = ({ title, icon: Icon, colorBase, colorHover, colorBorder, onClick, desc }: EmptyCardProps) => (
   <div
+    role="button"
+    tabIndex={0}
     onClick={onClick}
-    className={`
-            relative overflow-hidden rounded-3xl p-6 border-2 border-dashed border-slate-200 
-            ${colorBorder} ${colorHover} 
-            transition-all cursor-pointer group h-64 flex flex-col justify-center items-center text-center
-        `}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onClick();
+      }
+    }}
+    aria-label="Subir archivo"
+      className={`
+      relative overflow-hidden rounded-3xl p-6 border-2 border-dashed border-slate-200 
+      ${colorBorder} ${colorHover} 
+      transition-all cursor-pointer group h-64 flex flex-col justify-center items-center text-center
+      focus:outline-none focus:ring-4 focus:ring-offset-4 focus:ring-blue-400
+    `}
   >
     <div className={`mb-4 p-4 rounded-full bg-slate-50 group-hover:bg-white group-hover:shadow-lg transition-all ${colorBase}`}>
       <Icon size={32} />
