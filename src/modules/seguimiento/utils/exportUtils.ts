@@ -76,7 +76,7 @@ export const exportarReporteCompleto = async (
     const wb = XLSX.utils.book_new();
     const periodosRaw = Array.from(new Set([...datasetAct.map(d => d.periodo), ...datasetAnt.map(d => d.periodo)]))
       .filter(p => p !== "S/A" && p !== "S/D")
-      .sort();
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     // DETECCIÓN DINÁMICA DE AÑO
     const anioFull = reporteActual.split('-')[0]; // "2026"

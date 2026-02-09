@@ -49,7 +49,6 @@ const OTDetailView = ({ otItem, allData, onBack, onTechClick }: { otItem: OTFlow
   );
 };
 
-// DASHBOARD PRINCIPAL
 
 interface AnalysisDashboardProps {
   isOpen: boolean;
@@ -74,10 +73,16 @@ export const AnalysisDashboard = ({ isOpen, onClose, currentData, prevData, curr
   const [empFilters, setEmpFilters] = useState({ planta: "TODAS", periodo: "TODOS", cumplimiento: "TODOS" });
   const [empSearch, setEmpSearch] = useState("");
 
-  // Cálculos Memoizados
+  // Cálculos
   const flowStats = useMemo(() => analyzeBacklogFlow(currentData, prevData, currentCumplimiento), [currentData, prevData, currentCumplimiento]);
   const techStats = useMemo(() => analyzeTechnicians(currentData, currentCumplimiento), [currentData, currentCumplimiento]);
-  const plantasDisponibles = useMemo(() => ["TODAS", ...Array.from(new Set(currentData.map(d => d.planta))).sort()], [currentData]);
+  const plantasDisponibles = useMemo(() => {
+    const plantasUnicas = Array.from(new Set(currentData.map(d => d.planta)));
+
+    plantasUnicas.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+    return ["TODAS", ...plantasUnicas];
+  }, [currentData]);
 
   // Navegación
   const pushView = (view: ViewState) => setViewStack([...viewStack, view]);

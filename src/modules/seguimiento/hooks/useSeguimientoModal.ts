@@ -59,7 +59,10 @@ export const useSeguimientoModal = ({
 
     return {
       filteredGeneral: filteredData,
-      estadosDisponibles: [...lista, ...Array.from(estados).sort()]
+      estadosDisponibles: [
+      ...lista, 
+      ...Array.from(estados).sort((a, b) => a.localeCompare(b))
+    ]
     };
   }, [dataModo, viewDetail, PLANTAS_COMPLEJO, PLANTAS_PF_ALIMENTOS, filterEstado, searchTerm, previousOtSet, dataAnterior.length]);
 
@@ -102,8 +105,11 @@ export const useSeguimientoModal = ({
       );
     }
 
-    const activePlants = Array.from(new Set(baseOrders.map(o => o.planta))).sort();
-    const activePeriods = Array.from(new Set(baseOrders.map(o => o.periodo))).sort();
+    const activePlants = Array.from(new Set(baseOrders.map(o => o.planta)))
+      .sort((a, b) => a.localeCompare(b));
+
+    const activePeriods = Array.from(new Set(baseOrders.map(o => o.periodo)))
+      .sort((a, b) => a.localeCompare(b));
 
     return {
       orders: listOrders.map(o => ({

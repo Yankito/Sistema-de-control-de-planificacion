@@ -103,7 +103,12 @@ export const SeguimientoOTsView = ({
   };
 
   // Opciones para filtros internos
-  const yearsInRows = useMemo(() => ["TODOS", ...Array.from(new Set(dataActual.map(d => d.semana.split('-')[0]))).sort().reverse()], [dataActual]);
+  const yearsInRows = useMemo(() => {
+    const aniosUnicos = Array.from(new Set(dataActual.map(d => d.semana.split('-')[0])));
+    aniosUnicos.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    return ["TODAS", ...aniosUnicos];
+  }, [dataActual]);
+  
   const semanasInRows = useMemo(() => {
     const filas = selectedYear === "TODOS" ? dataActual : dataActual.filter(d => d.semana.startsWith(selectedYear));
     return ["TODAS", ...Array.from(new Set(filas.map(d => d.semana))).sort((a, b) => b.localeCompare(a))];

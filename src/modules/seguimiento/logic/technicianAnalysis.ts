@@ -20,7 +20,8 @@ export const prepareEmployeeProfile = (
   });
 
   // Calcular plantas activas
-  const activePlants = Array.from(new Set(techOrders.map(o => o.planta))).sort();
+  const activePlants = Array.from(new Set(techOrders.map(o => o.planta)))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   // Deduplicar (Por si una OT está en ambas listas, aunque raro, es seguro hacerlo)
   const uniqueOrders = Array.from(new Map(techOrders.map(item => [item.ot, item])).values());
