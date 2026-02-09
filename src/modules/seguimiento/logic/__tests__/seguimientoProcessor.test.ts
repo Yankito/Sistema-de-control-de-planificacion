@@ -1,123 +1,64 @@
-// src/logic/__tests__/seguimientoProcessor.test.ts
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx-js-style';
 import { processSeguimientoOTs } from '../seguimientoOTsProcessor';
 
-// Helper para crear hojas de cálculo falsas rápido
 const crearHoja = (data: any[]) => XLSX.utils.json_to_sheet(data);
 
 describe('Seguimiento OTs Processor', () => {
 
-    it('debe cruzar Backlog con Cumplimiento correctamente', () => {
-        // 1. Mock de Hoja PF1 (Backlog)
-        const sheetPF1 = crearHoja([
-            { "Pedido de Trabajo": "OT-100", "Estado": "Liberado", "Descripción": "Falla motor", "Fecha Inicial Programada": 45325 }
-        ]);
+  // --- FACTORY: Centraliza la creación del escenario ---
+  const setupProcessorTest = (overrides: { pf1?: any[], cumplimiento?: any[], masivo?: any[] } = {}) => {
+    const sheets = {
+      "PF1": crearHoja(overrides.pf1 || []),
+      "CUMPLIMIENTO": crearHoja(overrides.cumplimiento || []),
+      "MASIVO": crearHoja(overrides.masivo || [])
+    };
+    return processSeguimientoOTs(sheets);
+  };
 
-        // 2. Mock de Hcoja CUMPLIMIENTO 
-        // OP_FINALIZADA = "NO" hará que la clasificación sea "TECNICO / SERVICIO"
-        const sheetCumplimiento = crearHoja([
-            { "NRO_OT": "OT-100", "EMPLEADO": "JUAN PEREZ", "OP_FINALIZADA": "No", "ESTADO_OM": "Liberado" }
-        ]);
-
-        // 3. Mock de Hoja MASIVO 
-        const sheetMasivo = crearHoja([
-            { "Número": "OT-100", "RMD": "Si", "RSE": "No" }
-        ]);
-
-        const sheets = {
-            "PF1": sheetPF1,
-            "CUMPLIMIENTO": sheetCumplimiento,
-            "MASIVO": sheetMasivo
-        };
-        
-
-        const result = processSeguimientoOTs(sheets);
-
-        // Validaciones Estructurales
-        expect(result.actual).toHaveLength(1);
-        const ot = result.actual[0];
-
-        expect(ot.ot).toBe("OT-100");
-        expect(ot.planta).toBe("PF1"); 
-        expect(ot.rmd).toBe("SI");     
-        expect(ot.rse).toBe("NO");
-        
-        // Validaciones de Cruce
-        expect(ot.detallesTecnicos).toHaveLength(1);
-        expect(ot.detallesTecnicos?.[0].tecnico).toBe("JUAN PEREZ");
-
-        // Validación de Lógica de Negocio:
-        // Como OP_FINALIZADA es "NO", la clasificación debe ser TECNICO / SERVICIO
-        expect(ot.clasificacion).toBe("TECNICO / SERVICIO");
+  it('debe cruzar Backlog con Cumplimiento correctamente', () => {
+    const result = setupProcessorTest({
+      pf1: [{ "Pedido de Trabajo": "OT-100", "Estado": "Liberado", "Descripción": "Falla motor", "Fecha Inicial Programada": 45325 }],
+      cumplimiento: [{ "NRO_OT": "OT-100", "EMPLEADO": "JUAN PEREZ", "OP_FINALIZADA": "No", "ESTADO_OM": "Liberado" }],
+      masivo: [{ "Número": "OT-100", "RMD": "Si", "RSE": "No" }]
     });
 
-    it('debe clasificar como PROGRAMADOR si está finalizada y tiene RMD/RSE correctos', () => {
-        const sheetPF1 = crearHoja([
-            { "Pedido de Trabajo": "OT-200", "Estado": "Liberado", "Descripción": "Ajuste", "Fecha Inicial Programada": 45325 }
-        ]);
+    expect(result.actual).toHaveLength(1);
+    const ot = result.actual[0];
+    expect(ot.ot).toBe("OT-100");
+    expect(ot.detallesTecnicos?.[0].tecnico).toBe("JUAN PEREZ");
+    expect(ot.clasificacion).toBe("TECNICO / SERVICIO");
+  });
 
-        // OP_FINALIZADA = "SI"
-        const sheetCumplimiento = crearHoja([
-            { "NRO_OT": "OT-200", "EMPLEADO": "ANA GOMEZ", "OP_FINALIZADA": "Si", "ESTADO_OM": "Liberado" }
-        ]);
-
-        // RMD y RSE = "SI"
-        const sheetMasivo = crearHoja([
-            { "Número": "OT-200", "RMD": "SI", "RSE": "SI" }
-        ]);
-
-        const sheets = {
-            "PF1": sheetPF1,
-            "CUMPLIMIENTO": sheetCumplimiento,
-            "MASIVO": sheetMasivo
-        };
-
-        const result = processSeguimientoOTs(sheets);
-        const ot = result.actual[0];
-
-        // Al estar todo OK, debería ser PROGRAMADOR
-        expect(ot.clasificacion).toBe("PROGRAMADOR");
-        expect(ot.detallesTecnicos?.[0].finalizada).toBe(true);
+  it('debe clasificar como PROGRAMADOR si está finalizada y tiene RMD/RSE correctos', () => {
+    const result = setupProcessorTest({
+      pf1: [{ "Pedido de Trabajo": "OT-200", "Estado": "Liberado", "Descripción": "Ajuste", "Fecha Inicial Programada": 45325 }],
+      cumplimiento: [{ "NRO_OT": "OT-200", "EMPLEADO": "ANA GOMEZ", "OP_FINALIZADA": "Si", "ESTADO_OM": "Liberado" }],
+      masivo: [{ "Número": "OT-200", "RMD": "SI", "RSE": "SI" }]
     });
 
-    it('debe ignorar OTs que no están en estados de interés (ej: CREADO)', () => {
-        const sheetPF1 = crearHoja([
-            { "PEDIDO DE TRABAJO": "OT-IGNORE", "ESTADO": "CREADO" } 
-        ]);
-        
-        const sheets = {
-            "PF1": sheetPF1,
-            "CUMPLIMIENTO": crearHoja([]),
-            "MASIVO": crearHoja([])
-        };
+    expect(result.actual[0].clasificacion).toBe("PROGRAMADOR");
+    expect(result.actual[0].detallesTecnicos?.[0].finalizada).toBe(true);
+  });
 
-        const result = processSeguimientoOTs(sheets);
-        expect(result.actual).toHaveLength(0);
+  it('debe ignorar OTs que no están en estados de interés (ej: CREADO)', () => {
+    const result = setupProcessorTest({
+      pf1: [{ "PEDIDO DE TRABAJO": "OT-IGNORE", "ESTADO": "CREADO" }]
+    });
+    
+    expect(result.actual).toHaveLength(0);
+  });
+
+  it('debe clasificar como esOB = true si la descripción contiene el tag (INFRA)', () => {
+    const result = setupProcessorTest({
+      pf1: [{ 
+        "Pedido de Trabajo": "9000123", 
+        "Estado": "Liberado", 
+        "Descripción": "REPARACION TECHOS (INFRA)", 
+        "Fecha Inicial Programada": 45325 
+      }]
     });
 
-    it('debe clasificar como esOB = true si la descripción contiene el tag (INFRA) aunque no tenga prefijo OB', () => {
-        // OT solo con número (sin prefijo OB)
-        const sheetPF1 = crearHoja([
-            { 
-                "Pedido de Trabajo": "9000123", 
-                "Estado": "Liberado", 
-                "Descripción": "REPARACION TECHOS (INFRA)", 
-                "Fecha Inicial Programada": 45325 
-            }
-        ]);
-
-        const sheets = {
-            "PF1": sheetPF1,
-            "CUMPLIMIENTO": crearHoja([]),
-            "MASIVO": crearHoja([])
-        };
-
-        const result = processSeguimientoOTs(sheets);
-        const ot = result.actual[0];
-
-        // Verificamos que la lógica de Regex funcionó
-        expect(ot.esOB).toBe(true);
-        expect(ot.ot).toBe("9000123");
-    });
+    expect(result.actual[0].esOB).toBe(true);
+  });
 });

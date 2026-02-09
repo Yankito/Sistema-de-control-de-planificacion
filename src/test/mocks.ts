@@ -36,3 +36,41 @@ export const MOCK_DATA: AtrasoRow[] = [
     detallesTecnicos: [{ tecnico: "ANA GOMEZ", finalizada: true }]
   }
 ];
+
+export const MOCK_SEGUIMIENTO_DATA: AtrasoRow[] = [
+  { 
+    ot: '100', 
+    planta: 'PF1', 
+    estado: 'Pendiente', 
+    esOB: false, 
+    clasificacion: 'TECNICO / SERVICIO', 
+    descripcion: 'Test 1',
+    periodo: '2026',
+    semana: '2026-S01',
+    detallesTecnicos: [{ tecnico: 'JUAN', finalizada: false }] 
+  },
+  { 
+    ot: '101', 
+    planta: 'PF1', 
+    estado: 'En Proceso', 
+    esOB: false, 
+    clasificacion: 'TECNICO / SERVICIO', 
+    descripcion: 'Test 2',
+    periodo: '2026',
+    semana: '2026-S01',
+    detallesTecnicos: [{ tecnico: 'JUAN', finalizada: true }] 
+  },
+  { 
+    ot: '102', 
+    planta: 'PF2', 
+    estado: 'Pendiente', 
+    esOB: false, 
+    clasificacion: 'TECNICO / SERVICIO', 
+    descripcion: 'Test 3',
+    periodo: '2026',
+    semana: '2026-S01',
+    detallesTecnicos: []
+  }, 
+];
+
+export const MOCK_VIEW_DETAIL = { id: 'PF1', esOB: false, cat: undefined, isGlobal: false };

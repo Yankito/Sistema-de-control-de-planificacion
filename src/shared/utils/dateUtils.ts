@@ -103,3 +103,32 @@ export const getRangeFromWeekID = (weekID: string): string => {
 
   return getWeekRange(targetMonday);
 };
+
+/**
+ * Calcula el número de semana de forma consistente para el proyecto
+ */
+export const getWeekNumber = (d: Date): number => {
+  const date = new Date(d.getTime());
+  date.setHours(0, 0, 0, 0);
+  // Jueves de la semana actual determina el año de la semana
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+};
+
+/**
+ * Parsea una fecha en formato "DD/MM/YYYY" a objeto Date
+ */
+export const parseDDMMYYYY = (fechaStr: string): Date | null => {
+  if (!fechaStr || typeof fechaStr !== 'string') return null;
+  const [d, m, y] = fechaStr.split('/').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+/**
+ * Genera el label YYYY-SXX para consistencia en DB y filtros
+ */
+export const getWeekLabel = (d: Date): string => {
+  const week = getWeekNumber(d);
+  return `${d.getFullYear()}-S${week.toString().padStart(2, '0')}`;
+};

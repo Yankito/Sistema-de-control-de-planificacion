@@ -6,6 +6,26 @@ const DB_NAME = "sqlite:pf_seguimiento.db";
 export class DatabaseService {
   private static db: Database | null = null;
 
+  private static mapToAtrasoRow(r: any, lite: boolean = false): AtrasoRow {
+    return {
+      planta: r.planta,
+      ot: r.ot,
+      nroActivo: r.nro_activo,
+      descripcion: r.descripcion,
+      estado: r.estado,
+      clasificacion: r.clasificacion,
+      // Normalización de booleano para SQLite
+      esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1",
+      periodo: r.periodo,
+      semana: r.semana,
+      // Si es lite, devolvemos valores vacíos
+      rmd: lite ? "" : (r.rmd || ""),
+      rse: lite ? "" : (r.rse || ""),
+      detallesTecnicos: lite ? [] : JSON.parse(r.detalles_tecnicos || "[]"),
+      fecha: lite ? "" : (r.fecha || "")
+    };
+  }
+
   static async init() {
     if (!this.db) {
       this.db = await Database.load(DB_NAME);
@@ -164,43 +184,18 @@ export class DatabaseService {
     const db = await this.init();
     const snapshot = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
     if (snapshot.length === 0) return [];
-    const id = snapshot[0].id;
-    const rows = await db.select<any[]>(`SELECT * FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
     
-    return rows.map(r => ({
-        planta: r.planta, ot: r.ot, nroActivo: r.nro_activo, descripcion: r.descripcion, 
-        estado: r.estado, clasificacion: r.clasificacion,
-        esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
-        periodo: r.periodo, semana: r.semana, rmd: r.rmd, rse: r.rse, 
-        detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"), fecha: r.fecha
-    }));
+    const rows = await db.select<any[]>(`SELECT * FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [snapshot[0].id]);
+    return rows.map(r => this.mapToAtrasoRow(r));
   }
 
   static async getLatestSnapshot(tipo: 'SEGUIMIENTO' | 'CUMPLIMIENTO'): Promise<AtrasoRow[]> {
     const db = await this.init();
-    const snapshot = await db.select<any[]>("SELECT id, semana FROM snapshots WHERE tipo = $1 ORDER BY id DESC LIMIT 1", [tipo]);
+    const snapshot = await db.select<any[]>("SELECT id FROM snapshots WHERE tipo = $1 ORDER BY id DESC LIMIT 1", [tipo]);
     if (snapshot.length === 0) return [];
 
-    const id = snapshot[0].id;
-    const pedidosDeTrabajo = await db.select<any[]>(`
-        SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana, rmd, rse, detalles_tecnicos, fecha
-        FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
-    
-    return pedidosDeTrabajo.map(r => ({
-        planta: r.planta,
-        ot: r.ot,
-        nroActivo: r.nro_activo,
-        descripcion: r.descripcion,
-        estado: r.estado,
-        clasificacion: r.clasificacion,
-        esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
-        periodo: r.periodo,
-        semana: r.semana,
-        rmd: r.rmd,
-        rse: r.rse,
-        detallesTecnicos: JSON.parse(r.detalles_tecnicos || "[]"),
-        fecha: r.fecha
-    }));
+    const rows = await db.select<any[]>(`SELECT * FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [snapshot[0].id]);
+    return rows.map(r => this.mapToAtrasoRow(r));
   }
 
   static async getSnapshotLite(semana: string, tipo: string): Promise<AtrasoRow[]> {
@@ -208,26 +203,8 @@ export class DatabaseService {
     const snapshot = await db.select<any[]>("SELECT id FROM snapshots WHERE semana = $1 AND tipo = $2", [semana, tipo]);
     if (snapshot.length === 0) return [];
 
-    const id = snapshot[0].id;
-    // SOLO TRAEMOS LO NECESARIO PARA EL CRUCE DE FLUJO
-    const pedidosDeTrabajo = await db.select<any[]>(`
-        SELECT planta, ot, descripcion, estado, clasificacion, es_ob, periodo, semana 
-        FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [id]);
-    
-    return pedidosDeTrabajo.map(r => ({
-        planta: r.planta,
-        ot: r.ot,
-        nroActivo: r.nro_activo,
-        descripcion: r.descripcion,
-        estado: r.estado,
-        clasificacion: r.clasificacion,
-        esOB: r.es_ob === 1 || r.es_ob === true || r.es_ob === "1", 
-        periodo: r.periodo,
-        semana: r.semana,
-        rmd: "",
-        rse: "",
-        detallesTecnicos: []
-    }));
+    const rows = await db.select<any[]>(`SELECT * FROM pedidos_de_trabajo WHERE snapshot_id = $1`, [snapshot[0].id]);
+    return rows.map(r => this.mapToAtrasoRow(r, true));
   }
 
   static async getSemanasDisponibles(tipo: string): Promise<string[]> { 

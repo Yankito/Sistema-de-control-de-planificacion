@@ -1,63 +1,65 @@
+// src/modules/planificacion/hooks/useCalendarioGrid.ts
 import { useMemo } from "react";
-
-const getWeekNumber = (d: Date) => {
-  const inicioSemana1 = new Date(2026, 0, 5); 
-  const fechaActual = new Date(d);
-  fechaActual.setHours(0, 0, 0, 0);
-  inicioSemana1.setHours(0, 0, 0, 0);
-  const diffTime = fechaActual.getTime() - inicioSemana1.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return 0;
-  return Math.floor(diffDays / 7) + 1;
-};
+import { getWeekNumber, parseDDMMYYYY } from "../../../shared/utils/dateUtils";
 
 export const useCalendarioGrid = (planResult: any[], ordenesPorDia: any) => {
+  return useMemo(() => {
+    const base = planResult[0]?.fechaSugerida || "01/02/2026";
+    const fechaBase = parseDDMMYYYY(base);
     
-    return useMemo(() => {
-        const base = planResult[0]?.fechaSugerida || "01/02/2026"; 
-        const [, mes, anio] = base.split('/').map(Number);
-        const primerDia = new Date(anio, mes - 1, 1);
-        const ultimoDia = new Date(anio, mes, 0).getDate();
-        const nombreMes = primerDia.toLocaleString('es-ES', { month: 'long' });
-        
-        let startIdx = primerDia.getDay() - 1;
-        if (startIdx === -1) startIdx = 6;
+    if (!fechaBase) return { semanas: [], nombreMes: "", totalOrdenesMes: 0, anioActual: 2026 };
 
-        const diasArray = [
-            ...Array(startIdx).fill(null),
-            ...Array.from({ length: ultimoDia }, (_, i) => {
-                const d = (i + 1).toString().padStart(2, '0');
-                const m = mes.toString().padStart(2, '0');
-                return `${d}/${m}/${anio}`;
-            })
-        ];
+    const mes = fechaBase.getMonth() + 1;
+    const anio = fechaBase.getFullYear();
+    const primerDia = new Date(anio, mes - 1, 1);
+    const ultimoDia = new Date(anio, mes, 0).getDate();
+    
+    const nombreMes = primerDia.toLocaleString('es-ES', { month: 'long' });
+    
+    // Ajuste de inicio de semana (Lunes a Domingo)
+    let startIdx = primerDia.getDay() - 1;
+    if (startIdx === -1) startIdx = 6;
 
-        const semanasArr = [];
-        let totalMes = 0;
+    const diasArray = [
+      ...Array(startIdx).fill(null),
+      ...Array.from({ length: ultimoDia }, (_, i) => {
+        const d = (i + 1).toString().padStart(2, '0');
+        const m = mes.toString().padStart(2, '0');
+        return `${d}/${m}/${anio}`;
+      })
+    ];
 
-        for (let i = 0; i < diasArray.length; i += 7) {
-            const chunk = diasArray.slice(i, i + 7);
-            const fechaRefStr = chunk.find(d => d !== null);
-            let numSemana = 0;
-            if (fechaRefStr) {
-                const [d, m, y] = fechaRefStr.split('/').map(Number);
-                numSemana = getWeekNumber(new Date(y, m - 1, d));
-            }
-            chunk.forEach(fecha => {
-                if (fecha && ordenesPorDia[fecha]) totalMes += ordenesPorDia[fecha].length;
-            });
-            semanasArr.push({
-                numero: numSemana,
-                dias: chunk,
-                idSemana: `WEEK-${numSemana}`
-            });
+    let totalMes = 0;
+    const semanasArr = [];
+
+    for (let i = 0; i < diasArray.length; i += 7) {
+      const chunk = diasArray.slice(i, i + 7);
+      const fechaRefStr = chunk.find(d => d !== null);
+      
+      let numSemana = 0;
+      if (fechaRefStr) {
+        const dObj = parseDDMMYYYY(fechaRefStr);
+        if (dObj) numSemana = getWeekNumber(dObj);
+      }
+
+      chunk.forEach(fecha => {
+        if (fecha && ordenesPorDia[fecha]) {
+          totalMes += ordenesPorDia[fecha].length;
         }
+      });
 
-        return { 
-            semanas: semanasArr, 
-            nombreMes: nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1), 
-            totalOrdenesMes: totalMes, 
-            anioActual: anio 
-        };
-    }, [planResult, ordenesPorDia]);
+      semanasArr.push({
+        numero: numSemana,
+        dias: chunk,
+        idSemana: `WEEK-${numSemana}`
+      });
+    }
+
+    return { 
+      semanas: semanasArr, 
+      nombreMes: nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1), 
+      totalOrdenesMes: totalMes, 
+      anioActual: anio 
+    };
+  }, [planResult, ordenesPorDia]);
 };
